@@ -85,11 +85,11 @@ export default function SrsReviewSessionDemo({
     console.log(`[SRS Review Session] 卡片 #${currentCard.id} 评分: ${grade}`)
 
     // 增加已复习计数
-    setReviewedCount(prev => prev + 1)
+    setReviewedCount((prev: number) => prev + 1)
 
     // 切换到下一张卡片
     setTimeout(() => {
-      setCurrentIndex(prev => prev + 1)
+      setCurrentIndex((prev: number) => prev + 1)
     }, 300) // 延迟 300ms，让用户看到评分反馈
   }
 
