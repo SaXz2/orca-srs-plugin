@@ -100,13 +100,58 @@ const demoCards: Card[] = [
 
 ---
 
-### 3. 插件入口集成 (`main.ts`)
+### 3. 自定义块渲染器 (`SrsCardBlockRenderer`)
+
+**文件位置**: `src/components/SrsCardBlockRenderer.tsx`
+
+**功能**:
+- 在 Orca 编辑器中以自定义样式渲染 SRS 卡片块
+- 当块的 `_repr.type === "srs.card"` 时，自动使用该渲染器
+- 显示卡片图标和标题标识
+- 显示题目区域（`_repr.front`）
+- 可展开显示答案区域（`_repr.back`）
+- 提供 4 个评分按钮（Again / Hard / Good / Easy）
+- 评分按钮点击后输出到控制台（后续将接入 SRS 算法）
+
+**Props 接口**:
+```typescript
+type SrsCardBlockRendererProps = {
+  panelId: string
+  blockId: DbId
+  rndId: string
+  blockLevel: number
+  indentLevel: number
+  mirrorId?: DbId
+  withBreadcrumb?: boolean
+  initiallyCollapsed?: boolean
+  renderingMode?: "normal" | "simple" | "simple-children" | "readonly"
+  front: string  // 题目（从 _repr 接收）
+  back: string   // 答案（从 _repr 接收）
+}
+```
+
+**UI 设计**:
+- **卡片容器**: 带边框和圆角的卡片样式
+- **卡片标识**: 卡片图标 + "SRS 记忆卡片" 文字
+- **题目区域**: 灰色背景框
+- **答案区域**: 灰色背景框 + 蓝色左边框
+- **评分按钮**: 4 列网格布局（与 SrsCardDemo 一致）
+
+**技术实现**:
+- 使用 `BlockShell` 包装组件（Orca 标准做法）
+- 使用 `BlockChildren` 渲染子块
+- 设置 `contentEditable: false`（不可编辑）
+- 自定义 CSS 类名: `srs-repr-card`
+
+---
+
+### 4. 插件入口集成 (`main.ts`)
 
 **文件位置**: `src/main.ts`
 
 **已实现功能**:
 
-#### 命令注册
+#### 1. 命令注册
 ```typescript
 orca.commands.registerCommand(
   `${pluginName}.startReviewSession`,
@@ -115,7 +160,30 @@ orca.commands.registerCommand(
 )
 ```
 
-#### 工具栏按钮
+#### 2. 编辑器命令注册
+```typescript
+orca.commands.registerEditorCommand(
+  `${pluginName}.makeCardFromBlock`,
+  doFn,   // 执行转换
+  undoFn, // 撤销转换
+  { label: "SRS: 将块转换为记忆卡片" }
+)
+```
+
+**转换逻辑** (`makeCardFromBlock` 函数):
+- 读取当前块的纯文本作为题目（`front`）
+- 读取第一个子块的纯文本作为答案（`back`）
+- 使用 `core.editor.setRepr` 设置块的 `_repr`:
+  ```typescript
+  {
+    type: "srs.card",
+    front: "题目内容",
+    back: "答案内容"
+  }
+  ```
+- 支持撤销操作（恢复为 `type: "text"`）
+
+#### 3. 工具栏按钮
 ```typescript
 orca.toolbar.registerToolbarButton(`${pluginName}.reviewButton`, {
   icon: "ti ti-cards",           // Tabler Icons 卡片图标
@@ -124,25 +192,62 @@ orca.toolbar.registerToolbarButton(`${pluginName}.reviewButton`, {
 })
 ```
 
-#### 斜杠命令
+#### 4. 斜杠命令
 ```typescript
+// 斜杠命令 1: 开始复习
 orca.slashCommands.registerSlashCommand(`${pluginName}.review`, {
   icon: "ti ti-cards",
   group: "SRS",
   title: "开始 SRS 复习",
   command: `${pluginName}.startReviewSession`
 })
+
+// 斜杠命令 2: 转换为卡片
+orca.slashCommands.registerSlashCommand(`${pluginName}.makeCard`, {
+  icon: "ti ti-card-plus",
+  group: "SRS",
+  title: "转换为记忆卡片",
+  command: `${pluginName}.makeCardFromBlock`
+})
 ```
 
-#### 启动复习会话逻辑
+#### 5. 块渲染器注册
+```typescript
+orca.renderers.registerBlock(
+  "srs.card",           // 块类型
+  false,                // 不可作为纯文本编辑
+  SrsCardBlockRenderer, // 渲染器组件
+  [],                   // 无需 asset 字段
+  false                 // 不使用自定义子块布局
+)
+```
+
+#### 6. 转换器注册
+```typescript
+// Plain 转换器（必需）
+orca.converters.registerBlock(
+  "plain",
+  "srs.card",
+  (blockContent, repr) => {
+    return `[SRS 卡片]\n题目: ${repr.front}\n答案: ${repr.back}`
+  }
+)
+```
+
+**作用**:
+- 将 SRS 卡片块转换为纯文本格式
+- 用于导出、复制粘贴等场景
+
+#### 7. 启动复习会话逻辑
 - 创建 DOM 容器: `<div id="srs-review-session-container">`
 - 使用 React 18 的 `createRoot` API 渲染组件
 - 显示 Orca 通知: "复习会话已开始，共 5 张卡片"
 
-#### 清理逻辑 (unload)
+#### 8. 清理逻辑 (unload)
 - 卸载 React root
 - 移除 DOM 容器
 - 注销所有注册的命令和 UI 组件
+- 注销块渲染器和转换器
 
 ---
 
@@ -152,13 +257,14 @@ orca.slashCommands.registerSlashCommand(`${pluginName}.review`, {
 虎鲸标记 内置闪卡/
 ├── src/
 │   ├── components/
-│   │   ├── SrsCardDemo.tsx              # 单卡组件 (显示题目/答案/评分)
-│   │   └── SrsReviewSessionDemo.tsx     # 复习会话组件 (管理多张卡片)
+│   │   ├── SrsCardDemo.tsx              # 单卡组件 (模态框显示题目/答案/评分)
+│   │   ├── SrsReviewSessionDemo.tsx     # 复习会话组件 (管理多张卡片)
+│   │   └── SrsCardBlockRenderer.tsx     # 自定义块渲染器 (在编辑器中渲染 SRS 卡片)
 │   ├── libs/
 │   │   └── l10n.ts                      # 国际化工具 (未修改)
 │   ├── translations/
 │   │   └── zhCN.ts                      # 中文翻译 (未修改)
-│   ├── main.ts                          # 插件入口 (已集成复习会话)
+│   ├── main.ts                          # 插件入口 (已集成复习会话和块渲染器)
 │   ├── orca.d.ts                        # Orca API 类型定义 (5000+ 行)
 │   └── vite-env.d.ts                    # Vite 环境类型
 ├── dist/
@@ -176,7 +282,9 @@ orca.slashCommands.registerSlashCommand(`${pluginName}.review`, {
 
 ## 🚀 如何测试当前功能
 
-### 1. 构建插件
+### 方式 A: 测试复习会话（模态框 UI）
+
+#### 1. 构建插件
 
 ```bash
 cd "D:\orca插件\虎鲸标记 内置闪卡"
@@ -262,7 +370,7 @@ npm run build
 
 ```
 [虎鲸标记 内置闪卡] 插件已加载
-[虎鲸标记 内置闪卡] 命令和 UI 组件已注册
+[虎鲸标记 内置闪卡] 命令、UI 组件和渲染器已注册
 [虎鲸标记 内置闪卡] 开始 SRS 复习会话
 [虎鲸标记 内置闪卡] SRS 复习会话已开始
 
@@ -273,6 +381,89 @@ npm run build
 [SRS Review Session] 卡片 #5 评分: good
 
 [SRS Review Session] 本次复习会话结束，共复习 5 张卡片
+```
+
+---
+
+### 方式 B: 测试块渲染器（编辑器内渲染）
+
+#### 1. 构建插件
+
+与方式 A 相同（确保 `dist/index.js` 已生成）
+
+#### 2. 在 Orca 中启用插件
+
+与方式 A 相同
+
+#### 3. 创建一个 SRS 卡片块
+
+有 2 种方式创建:
+
+##### 方式 1: 使用斜杠命令转换现有块
+
+1. 在 Orca 编辑器中创建一个新块，输入题目文本，例如:
+   ```
+   什么是闭包（Closure）？
+   ```
+2. 按回车创建子块，输入答案文本，例如:
+   ```
+   闭包是指函数能够访问其词法作用域外的变量，即使函数在其词法作用域之外执行。
+   ```
+3. 返回父块（题目块），光标定位在该块
+4. 输入 `/` 打开斜杠命令菜单
+5. 搜索 "**转换为记忆卡片**"
+6. 回车执行
+
+**预期效果**:
+- 块变为 SRS 卡片样式（带边框和卡片图标）
+- 显示题目内容
+- 显示"显示答案"按钮
+- 子块被收纳在卡片内部
+
+##### 方式 2: 使用命令面板
+
+1. 创建块结构（同上）
+2. 按 `Ctrl+P` (Windows) 或 `Cmd+P` (macOS)
+3. 搜索 "**SRS: 将块转换为记忆卡片**"
+4. 回车执行
+
+#### 4. 测试卡片交互
+
+**基本交互**:
+1. **查看卡片状态**
+   - 卡片顶部显示图标 🃏 和 "SRS 记忆卡片" 文字
+   - 题目区域显示题目内容
+   - 初始状态只显示"显示答案"按钮
+
+2. **显示答案**
+   - 点击"显示答案"按钮
+   - 答案区域展开（带蓝色左边框）
+   - 出现 4 个评分按钮
+
+3. **评分操作**
+   - 点击任一评分按钮（Again / Hard / Good / Easy）
+   - 控制台输出日志: `[SRS Card Block Renderer] 卡片 #123 评分: good`
+   - 显示通知: "评分已记录：good"
+   - 答案区域自动收起
+
+4. **撤销转换**
+   - 按 `Ctrl+Z` (Windows) 或 `Cmd+Z` (macOS)
+   - 块恢复为普通文本块
+   - 子块结构保持不变
+
+#### 5. 查看调试日志
+
+打开 Orca 开发者工具，查看控制台输出:
+
+```
+[虎鲸标记 内置闪卡] 插件已加载
+[虎鲸标记 内置闪卡] 命令、UI 组件和渲染器已注册
+
+[虎鲸标记 内置闪卡] 块 #123 已转换为 SRS 卡片
+  题目: 什么是闭包（Closure）？
+  答案: 闭包是指函数能够访问其词法作用域外的变量...
+
+[SRS Card Block Renderer] 卡片 #123 评分: good
 ```
 
 ---
@@ -664,6 +855,13 @@ function myFunction(paramName: string): void {
 
 ---
 
-**最后更新**: 2025-01-XX
-**当前状态**: ✅ 阶段 1 完成 (前端 UI 使用假数据)
+**最后更新**: 2025-01-11
+**当前状态**:
+- ✅ 阶段 1 完成 (前端 UI 使用假数据)
+- ✅ 阶段 5 部分完成 (自定义卡片渲染器)
+  - ✅ 块渲染器实现
+  - ✅ 转换命令实现
+  - ✅ 支持撤销/重做
+  - ⏸ SRS 状态显示（待实现）
+
 **下一步**: 🚧 阶段 2 - 实现 SRS 算法模块
