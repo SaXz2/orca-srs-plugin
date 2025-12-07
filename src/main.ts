@@ -322,10 +322,10 @@ const collectSrsBlocks = async (): Promise<BlockWithRepr[]> => {
       const allBlocks = await orca.invokeBackend("get-all-blocks") as Block[] || []
       console.log(`[${pluginName}] collectSrsBlocks: get-all-blocks 返回了 ${allBlocks.length} 个块`)
       
-      // 备用方案2：尝试查询所有可能的标签
-      const possibleTags = ["card", "card/", "card/english", "card/物理", "card/js", "card/数学"]
+      // 备用方案2：查询 #card 标签
+      const possibleTags = ["card"]  // 移除所有 card/ 格式，只支持 #card
       let foundBlocks: Block[] = []
-      
+
       for (const tag of possibleTags) {
         try {
           const taggedWithSpecific = await orca.invokeBackend("get-blocks-with-tags", [tag]) as Block[] || []
@@ -353,7 +353,7 @@ const collectSrsBlocks = async (): Promise<BlockWithRepr[]> => {
               return false
             }
             const tagAlias = ref.alias || ""
-            const isMatch = tagAlias === "card" || tagAlias.startsWith("card/")
+            const isMatch = tagAlias === "card"  // 只匹配 #card，不支持 #card/xxx
             if (isMatch) {
               console.log(`[${pluginName}] collectSrsBlocks: 块 #${block.id} 匹配标签: ${tagAlias}`)
             }
@@ -398,6 +398,7 @@ const collectReviewCards = async (): Promise<ReviewCard[]> => {
       ? await loadCardSrsState(block.id)
       : await writeInitialSrsState(block.id, now)
 
+    // 从标签属性系统读取 deck 名称
     const deckName = extractDeckName(block)
 
     cards.push({
@@ -435,28 +436,70 @@ const buildReviewQueue = (cards: ReviewCard[]): ReviewCard[] => {
 }
 
 /**
- * 从块的 refs 中提取 deck 名称
- * 规则：
- * - #card → "Default"
- * - #card/English → "English"
- * - #card/物理 → "物理"
+ * 从块的标签属性系统中提取 deck 名称
+ *
+ * 工作原理：
+ * 1. 找到 type=2 (RefType.Property) 且 alias="card" 的引用
+ * 2. 从引用的 data 数组中找到 name="deck" 的属性
+ * 3. 返回该属性的 value，如果不存在返回 "Default"
+ *
+ * 用户操作流程：
+ * 1. 在 Orca 标签页面为 #card 标签定义属性 "deck"（类型：多选文本）
+ * 2. 添加可选值（如 "English", "物理", "数学"）
+ * 3. 给块打 #card 标签后，从下拉菜单选择 deck 值
+ *
+ * @param block - 块对象
+ * @returns deck 名称，默认为 "Default"
  */
 function extractDeckName(block: Block): string {
-  if (!block.refs || block.refs.length === 0) return "Default"
-
-  for (const ref of block.refs) {
-    if (ref.type === 2) { // 标签引用
-      const tagAlias = ref.alias || ""
-
-      if (tagAlias === "card") {
-        return "Default"
-      } else if (tagAlias.startsWith("card/")) {
-        const deckName = tagAlias.substring(5)
-        return deckName || "Default"
-      }
-    }
+  // 边界情况：块没有引用
+  if (!block.refs || block.refs.length === 0) {
+    return "Default"
   }
 
+  // 1. 找到 #card 标签引用
+  const cardRef = block.refs.find(ref =>
+    ref.type === 2 &&      // RefType.Property（标签引用）
+    ref.alias === "card"   // 标签名称为 "card"
+  )
+
+  // 边界情况：没有找到 #card 标签引用
+  if (!cardRef) {
+    return "Default"
+  }
+
+  // 边界情况：标签引用没有关联数据
+  if (!cardRef.data || cardRef.data.length === 0) {
+    return "Default"
+  }
+
+  // 2. 从标签关联数据中读取 deck 属性
+  const deckProperty = cardRef.data.find(d => d.name === "deck")
+
+  // 边界情况：没有设置 deck 属性
+  if (!deckProperty) {
+    return "Default"
+  }
+
+  // 3. 返回 deck 值
+  const deckValue = deckProperty.value
+
+  // 处理多选类型（数组）和单选类型（字符串）
+  if (Array.isArray(deckValue)) {
+    // 多选类型：取数组的第一个值
+    if (deckValue.length === 0 || !deckValue[0] || typeof deckValue[0] !== "string") {
+      return "Default"
+    }
+    return deckValue[0].trim()
+  } else if (typeof deckValue === "string") {
+    // 单选类型：直接使用字符串
+    if (deckValue.trim() === "") {
+      return "Default"
+    }
+    return deckValue.trim()
+  }
+
+  // 其他类型：无效
   return "Default"
 }
 
@@ -558,10 +601,10 @@ async function scanCardsFromTags() {
         const allBlocks = await orca.invokeBackend("get-all-blocks") as Block[] || []
         console.log(`[${pluginName}] get-all-blocks 返回了 ${allBlocks.length} 个块`)
         
-        // 备用方案2：尝试查询所有可能的标签
-        const possibleTags = ["card", "card/", "card/english", "card/物理", "card/js", "card/数学"]
+        // 备用方案2：查询 #card 标签
+        const possibleTags = ["card"]  // 移除所有 card/ 格式，只支持 #card
         let foundBlocks: Block[] = []
-        
+
         for (const tag of possibleTags) {
           try {
             const taggedWithSpecific = await orca.invokeBackend("get-blocks-with-tags", [tag]) as Block[] || []
@@ -589,7 +632,7 @@ async function scanCardsFromTags() {
                 return false
               }
               const tagAlias = ref.alias || ""
-              const isMatch = tagAlias === "card" || tagAlias.startsWith("card/")
+              const isMatch = tagAlias === "card"  // 只匹配 #card，不支持 #card/xxx
               if (isMatch) {
                 console.log(`[${pluginName}] 块 #${block.id} 匹配标签: ${tagAlias}`)
               }
@@ -634,7 +677,7 @@ async function scanCardsFromTags() {
 
       const { front, back } = resolveFrontBack(blockWithRepr)
 
-      // c. 从标签中解析 deck 名称（新逻辑）
+      // c. 从标签属性系统中读取 deck 名称（block.refs[].data）
       const deckName = extractDeckName(block)
 
       // d. 设置 _repr（直接修改，Valtio 会触发响应式更新）
