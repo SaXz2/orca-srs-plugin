@@ -5,7 +5,7 @@ import SrsCardBlockRenderer from "./components/SrsCardBlockRenderer"
 import SrsCardBrowser from "./components/SrsCardBrowser"
 import type { BlockForConversion, Repr, CursorData, DbId, Block } from "./orca.d.ts"
 import { loadCardSrsState, writeInitialSrsState } from "./srs/storage"
-import type { ReviewCard } from "./srs/types"
+import type { ReviewCard, DeckInfo, DeckStats } from "./srs/types"
 
 // 扩展 Block 类型以包含 _repr 属性（运行时存在但类型定义中缺失）
 type BlockWithRepr = Block & { _repr?: Repr }
@@ -222,14 +222,20 @@ export async function unload() {
 /**
  * 显示 SRS 复习会话组件（使用真实队列）
  */
-async function startReviewSession() {
+async function startReviewSession(deckName?: string) {
   if (reviewSessionContainer) {
     closeReviewSession()
   }
 
   try {
-    const cards = await collectReviewCards()
-    const queue = buildReviewQueue(cards)
+    const allCards = await collectReviewCards()
+    
+    // 按 deck 过滤
+    const deckCards = deckName !== undefined
+      ? allCards.filter(card => card.deck === deckName)
+      : allCards
+      
+    const queue = buildReviewQueue(deckCards)
 
     if (queue.length === 0) {
       orca.notify("info", "今天没有需要复习的到期卡或新卡", { title: "SRS 复习" })
@@ -305,7 +311,69 @@ const resolveFrontBack = (block: BlockWithRepr) => {
 }
 
 const collectSrsBlocks = async (): Promise<BlockWithRepr[]> => {
-  const tagged = (await orca.invokeBackend("get-blocks-with-tags", ["card"])) as BlockWithRepr[] | undefined
+  // 尝试直接查询 #card 标签
+  let tagged = (await orca.invokeBackend("get-blocks-with-tags", ["card"])) as BlockWithRepr[] | undefined
+  
+  // 如果直接查询无结果，使用备用方案获取所有块并过滤
+  if (!tagged || tagged.length === 0) {
+    console.log(`[${pluginName}] collectSrsBlocks: 直接查询无结果，使用备用方案`)
+    try {
+      // 备用方案1：尝试获取所有块
+      const allBlocks = await orca.invokeBackend("get-all-blocks") as Block[] || []
+      console.log(`[${pluginName}] collectSrsBlocks: get-all-blocks 返回了 ${allBlocks.length} 个块`)
+      
+      // 备用方案2：尝试查询所有可能的标签
+      const possibleTags = ["card", "card/", "card/english", "card/物理", "card/js", "card/数学"]
+      let foundBlocks: Block[] = []
+      
+      for (const tag of possibleTags) {
+        try {
+          const taggedWithSpecific = await orca.invokeBackend("get-blocks-with-tags", [tag]) as Block[] || []
+          console.log(`[${pluginName}] collectSrsBlocks: 标签 "${tag}" 找到 ${taggedWithSpecific.length} 个块`)
+          foundBlocks = [...foundBlocks, ...taggedWithSpecific]
+        } catch (e) {
+          console.log(`[${pluginName}] collectSrsBlocks: 查询标签 "${tag}" 失败:`, e)
+        }
+      }
+      
+      if (foundBlocks.length > 0) {
+        tagged = foundBlocks as BlockWithRepr[]
+        console.log(`[${pluginName}] collectSrsBlocks: 多标签查询找到 ${tagged.length} 个带 #card 标签的块`)
+      } else {
+        // 最后备用方案：手动过滤所有块
+        tagged = allBlocks.filter(block => {
+          if (!block.refs || block.refs.length === 0) {
+            console.log(`[${pluginName}] collectSrsBlocks: 块 #${block.id} 无 refs`)
+            return false
+          }
+          
+          const hasCardTag = block.refs.some(ref => {
+            if (ref.type !== 2) {
+              console.log(`[${pluginName}] collectSrsBlocks: 块 #${block.id} ref type 不是 2: ${ref.type}`)
+              return false
+            }
+            const tagAlias = ref.alias || ""
+            const isMatch = tagAlias === "card" || tagAlias.startsWith("card/")
+            if (isMatch) {
+              console.log(`[${pluginName}] collectSrsBlocks: 块 #${block.id} 匹配标签: ${tagAlias}`)
+            }
+            return isMatch
+          })
+          
+          if (hasCardTag) {
+            console.log(`[${pluginName}] collectSrsBlocks: 块 #${block.id} 有 #card 标签`)
+          }
+          
+          return hasCardTag
+        }) as BlockWithRepr[]
+        console.log(`[${pluginName}] collectSrsBlocks: 手动过滤找到 ${tagged.length} 个带 #card 标签的块`)
+      }
+    } catch (error) {
+      console.error(`[${pluginName}] collectSrsBlocks 备用方案失败:`, error)
+      tagged = []
+    }
+  }
+  
   const stateBlocks = Object.values(orca.state.blocks || {})
     .filter((b): b is BlockWithRepr => !!b && (b as BlockWithRepr)._repr?.type === "srs.card")
 
@@ -330,12 +398,15 @@ const collectReviewCards = async (): Promise<ReviewCard[]> => {
       ? await loadCardSrsState(block.id)
       : await writeInitialSrsState(block.id, now)
 
+    const deckName = extractDeckName(block)
+
     cards.push({
       id: block.id,
       front,
       back,
       srs: srsState,
-      isNew: !srsState.lastReviewed || srsState.reps === 0
+      isNew: !srsState.lastReviewed || srsState.reps === 0,
+      deck: deckName  // 新增字段
     })
   }
 
@@ -363,6 +434,98 @@ const buildReviewQueue = (cards: ReviewCard[]): ReviewCard[] => {
   return queue
 }
 
+/**
+ * 从块的 refs 中提取 deck 名称
+ * 规则：
+ * - #card → "Default"
+ * - #card/English → "English"
+ * - #card/物理 → "物理"
+ */
+function extractDeckName(block: Block): string {
+  if (!block.refs || block.refs.length === 0) return "Default"
+
+  for (const ref of block.refs) {
+    if (ref.type === 2) { // 标签引用
+      const tagAlias = ref.alias || ""
+
+      if (tagAlias === "card") {
+        return "Default"
+      } else if (tagAlias.startsWith("card/")) {
+        const deckName = tagAlias.substring(5)
+        return deckName || "Default"
+      }
+    }
+  }
+
+  return "Default"
+}
+
+/**
+ * 计算 deck 统计信息
+ * 从 ReviewCard 列表中统计每个 deck 的卡片数量和到期情况
+ */
+function calculateDeckStats(cards: ReviewCard[]): DeckStats {
+  const deckMap = new Map<string, DeckInfo>()
+
+  // 遍历所有卡片，统计各 deck 信息
+  for (const card of cards) {
+    const deckName = card.deck
+
+    if (!deckMap.has(deckName)) {
+      deckMap.set(deckName, {
+        name: deckName,
+        totalCount: 0,
+        newCount: 0,
+        overdueCount: 0,
+        todayCount: 0,
+        futureCount: 0
+      })
+    }
+
+    const deckInfo = deckMap.get(deckName)!
+    deckInfo.totalCount++
+
+    if (card.isNew) {
+      deckInfo.newCount++
+    } else {
+      // 判断卡片属于哪个到期类别
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      if (card.srs.due < today) {
+        deckInfo.overdueCount++
+      } else if (card.srs.due >= today && card.srs.due < tomorrow) {
+        deckInfo.todayCount++
+      } else {
+        deckInfo.futureCount++
+      }
+    }
+  }
+
+  const decks = Array.from(deckMap.values())
+
+  // 排序：Default 在最前，其他按名称排序
+  decks.sort((a, b) => {
+    if (a.name === "Default" && b.name !== "Default") return -1
+    if (a.name !== "Default" && b.name === "Default") return 1
+    return a.name.localeCompare(b.name)
+  })
+
+  return {
+    decks,
+    totalCards: cards.length,
+    totalNew: cards.filter(c => c.isNew).length,
+    totalOverdue: cards.filter(c => {
+      if (c.isNew) return false
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      return c.srs.due < today
+    }).length
+  }
+}
+
 // ========================================
 // 辅助函数：扫描带标签的块并转换为 SRS 卡片
 // ========================================
@@ -374,7 +537,7 @@ const buildReviewQueue = (cards: ReviewCard[]): ReviewCard[] => {
  * 2. 对每个块：
  *    - 父块文本作为题目（front）
  *    - 第一个子块文本作为答案（back）
- *    - 从 #deck/xxx 标签中解析 deck 名称
+ *    - 从 #card 或 #card/xxx 标签中解析 deck 名称
  *    - 设置 _repr.type = "srs.card"
  *    - 设置初始 SRS 属性
  */
@@ -382,8 +545,70 @@ async function scanCardsFromTags() {
   console.log(`[${pluginName}] 开始扫描带 #card 标签的块...`)
 
   try {
-    // 1. 获取所有带 #card 标签的块
+    // 1. 获取所有带 #card 标签的块（包括 #card 和 #card/xxx 格式）
     const taggedBlocks = await orca.invokeBackend("get-blocks-with-tags", ["card"]) as Block[]
+    
+    // 如果 API 不支持层级标签查询，需要获取所有块然后过滤
+    // 这里先尝试直接查询，如果结果为空则使用备用方案
+    let allTaggedBlocks = taggedBlocks
+    if (!taggedBlocks || taggedBlocks.length === 0) {
+      console.log(`[${pluginName}] 直接查询 #card 标签无结果，尝试获取所有块并过滤`)
+      try {
+        // 备用方案1：尝试获取所有块
+        const allBlocks = await orca.invokeBackend("get-all-blocks") as Block[] || []
+        console.log(`[${pluginName}] get-all-blocks 返回了 ${allBlocks.length} 个块`)
+        
+        // 备用方案2：尝试查询所有可能的标签
+        const possibleTags = ["card", "card/", "card/english", "card/物理", "card/js", "card/数学"]
+        let foundBlocks: Block[] = []
+        
+        for (const tag of possibleTags) {
+          try {
+            const taggedWithSpecific = await orca.invokeBackend("get-blocks-with-tags", [tag]) as Block[] || []
+            console.log(`[${pluginName}] 标签 "${tag}" 找到 ${taggedWithSpecific.length} 个块`)
+            foundBlocks = [...foundBlocks, ...taggedWithSpecific]
+          } catch (e) {
+            console.log(`[${pluginName}] 查询标签 "${tag}" 失败:`, e)
+          }
+        }
+        
+        if (foundBlocks.length > 0) {
+          allTaggedBlocks = foundBlocks
+          console.log(`[${pluginName}] 多标签查询找到 ${allTaggedBlocks.length} 个带 #card 标签的块`)
+        } else {
+          // 最后备用方案：手动过滤所有块
+          allTaggedBlocks = allBlocks.filter(block => {
+            if (!block.refs || block.refs.length === 0) {
+              console.log(`[${pluginName}] 块 #${block.id} 无 refs`)
+              return false
+            }
+            
+            const hasCardTag = block.refs.some(ref => {
+              if (ref.type !== 2) {
+                console.log(`[${pluginName}] 块 #${block.id} ref type 不是 2: ${ref.type}`)
+                return false
+              }
+              const tagAlias = ref.alias || ""
+              const isMatch = tagAlias === "card" || tagAlias.startsWith("card/")
+              if (isMatch) {
+                console.log(`[${pluginName}] 块 #${block.id} 匹配标签: ${tagAlias}`)
+              }
+              return isMatch
+            })
+            
+            if (hasCardTag) {
+              console.log(`[${pluginName}] 块 #${block.id} 有 #card 标签`)
+            }
+            
+            return hasCardTag
+          })
+          console.log(`[${pluginName}] 手动过滤找到 ${allTaggedBlocks.length} 个带 #card 标签的块`)
+        }
+      } catch (error) {
+        console.error(`[${pluginName}] 备用方案失败:`, error)
+        allTaggedBlocks = []
+      }
+    }
 
     if (!taggedBlocks || taggedBlocks.length === 0) {
       orca.notify("info", "没有找到带 #card 标签的块", { title: "SRS 扫描" })
@@ -391,13 +616,13 @@ async function scanCardsFromTags() {
       return
     }
 
-    console.log(`[${pluginName}] 找到 ${taggedBlocks.length} 个带 #card 标签的块`)
+    console.log(`[${pluginName}] 找到 ${allTaggedBlocks.length} 个带 #card 标签的块`)
 
     let convertedCount = 0
     let skippedCount = 0
 
     // 2. 处理每个块
-    for (const block of taggedBlocks) {
+    for (const block of allTaggedBlocks) {
       const blockWithRepr = block as BlockWithRepr
 
       // 如果已经是 srs.card 类型，跳过
@@ -409,29 +634,15 @@ async function scanCardsFromTags() {
 
       const { front, back } = resolveFrontBack(blockWithRepr)
 
-      // c. 从标签中解析 deck 名称
-      // 遍历 block.refs，找到标签引用（type === 2），检查是否是 deck 标签
-      let deckName: string | undefined = undefined
-      if (block.refs && block.refs.length > 0) {
-        for (const ref of block.refs) {
-          // type === 2 表示这是一个标签引用（Property reference）
-          if (ref.type === 2) {
-            const tagAlias = ref.alias || ""
-            // 检查是否是 deck 标签（格式：deck/名称）
-            if (tagAlias.startsWith("deck/")) {
-              deckName = tagAlias.substring(5) // 提取 "deck/" 之后的部分
-              break
-            }
-          }
-        }
-      }
+      // c. 从标签中解析 deck 名称（新逻辑）
+      const deckName = extractDeckName(block)
 
       // d. 设置 _repr（直接修改，Valtio 会触发响应式更新）
       blockWithRepr._repr = {
         type: "srs.card",
         front: front,
         back: back,
-        ...(deckName && { deck: deckName }) // 如果有 deck，则添加
+        deck: deckName  // 直接赋值，不再使用条件展开
       }
 
       // e. 设置初始 SRS 属性（如果块还没有这些属性）
@@ -568,3 +779,6 @@ function closeCardBrowser() {
 
   console.log(`[${pluginName}] 卡片浏览器已关闭`)
 }
+
+// 导出供浏览器组件使用
+export { calculateDeckStats, collectReviewCards, extractDeckName, startReviewSession }
