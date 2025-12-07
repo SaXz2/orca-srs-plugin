@@ -309,16 +309,17 @@ interface CursorData {
    - 第一个子块 = 答案
    - 父块打标签 `#card`
 2. 可选 deck：
-   - 通过标签 `#deck/xxx` 表示这个卡片属于哪个 deck，例如：
-     - `#deck/英语`
-     - `#deck/物理`
+   - 在 Orca 标签页面为 `#card` 标签定义 "deck" 属性（类型：多选文本）
+   - 添加可选值（如 "English"、"物理"、"数学"）
+   - 给块打 `#card` 标签后，从下拉菜单选择 deck 值
+   - 如果不选择，默认归入 "Default" deck
 
 插件行为：
 
 - 扫描所有打了 `#card` 的父块，把它们视为卡片。
 - 从父块文本中取题目（front）。
 - 从第一个子块内容中取答案（back）。
-- 从 `#deck/...` 标签中解析 deck 名称。
+- 从 `block.refs[].data` 读取 deck 值（支持数组和字符串格式）。
 - 为这些块设置 `_repr.type = "srs.card"`，由自定义渲染器显示卡片 UI。
 - 使用块属性保存 SRS 状态（例如 `srs.isCard`, `srs.due`, `srs.interval`, `srs.ease`, `srs.reps`, `srs.lapses`）。
 
