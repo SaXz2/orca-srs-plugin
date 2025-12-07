@@ -4,26 +4,32 @@
  * 功能：
  * - 初始显示题目(front)和"显示答案"按钮
  * - 点击后显示答案(back)和四个评分按钮
- * - 点击评分按钮会调用 onGrade 回调
+ * - 点击评分按钮会调用 onGrade 回调（已接入真实 SRS）
  */
 
 // 从全局 window 对象获取 React（Orca 插件约定）
 const { useState } = window.React
 const { Button, ModalOverlay } = orca.components
 
+import type { Grade, SrsState } from "../srs/types"
+
 // 组件 Props 类型定义
 type SrsCardDemoProps = {
   front: string  // 题目文本
   back: string   // 答案文本
-  onGrade: (grade: "again" | "hard" | "good" | "easy") => void  // 评分回调
+  onGrade: (grade: Grade) => Promise<void> | void  // 评分回调
   onClose?: () => void  // 关闭回调
+  srsInfo?: Partial<SrsState>  // 显示在卡片底部的 SRS 信息
+  isGrading?: boolean         // 正在写入 SRS 状态时禁用按钮
 }
 
 export default function SrsCardDemo({
   front,
   back,
   onGrade,
-  onClose
+  onClose,
+  srsInfo,
+  isGrading = false
 }: SrsCardDemoProps) {
   // 状态：是否已显示答案
   const [showAnswer, setShowAnswer] = useState(false)
@@ -32,17 +38,11 @@ export default function SrsCardDemo({
    * 处理评分按钮点击
    * @param grade 评分等级
    */
-  const handleGrade = (grade: "again" | "hard" | "good" | "easy") => {
+  const handleGrade = async (grade: Grade) => {
+    if (isGrading) return
     console.log(`[SRS Card Demo] 用户选择评分: ${grade}`)
-    onGrade(grade)
-
-    // 评分后重置状态，准备下一张卡片
-    setShowAnswer(false)
-
-    // 如果有关闭回调，延迟后关闭
-    if (onClose) {
-      setTimeout(() => onClose(), 300)
-    }
+    await onGrade(grade)
+    setShowAnswer(false) // 评分后重置，准备下一张卡片
   }
 
   return (
@@ -215,6 +215,25 @@ export default function SrsCardDemo({
         }}>
           {!showAnswer ? '点击"显示答案"查看答案内容' : '根据记忆程度选择评分'}
         </div>
+
+        {srsInfo && (
+          <div style={{
+            marginTop: '16px',
+            fontSize: '12px',
+            color: 'var(--orca-color-text-2)',
+            backgroundColor: 'var(--orca-color-bg-2)',
+            padding: '10px 12px',
+            borderRadius: '8px'
+          }}>
+            <div>下次复习：{srsInfo.due ? new Date(srsInfo.due).toLocaleString() : "未安排"}</div>
+            <div style={{ marginTop: '6px' }}>
+              间隔：{srsInfo.interval ?? "-"} 天 / 稳定度：{srsInfo.stability?.toFixed ? srsInfo.stability.toFixed(2) : srsInfo.stability} / 难度：{srsInfo.difficulty?.toFixed ? srsInfo.difficulty.toFixed(2) : srsInfo.difficulty}
+            </div>
+            <div style={{ marginTop: '4px' }}>
+              已复习：{srsInfo.reps ?? 0} 次，遗忘：{srsInfo.lapses ?? 0} 次
+            </div>
+          </div>
+        )}
       </div>
     </ModalOverlay>
   )

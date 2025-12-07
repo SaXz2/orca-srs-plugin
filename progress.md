@@ -6,7 +6,30 @@
 - **技术栈**: TypeScript + React 18 (通过 `window.React` 全局访问)
 - **构建工具**: Vite + SWC
 - **目标平台**: Orca Note 插件系统
-- **当前阶段**: 前端 UI 开发 (使用假数据)
+- **当前阶段**: FSRS 算法与真实数据接入（已可用），继续完善体验与筛选
+
+---
+
+## ✅ 新增/完成 (阶段 2/3/6)
+
+### 0. FSRS 算法 & 存储接入
+- **新增文件**: `src/srs/algorithm.ts`（封装 `nextReviewState(prevState, grade)`，使用官方 ts-fsrs 默认参数，返回稳定度/难度/间隔/due/reps/lapses 等；附 `runExamples()` 示例）  
+- **新增文件**: `src/srs/storage.ts`（`loadCardSrsState` / `saveCardSrsState` / `writeInitialSrsState` / `updateSrsState`，统一通过 `core.editor.setProperties` 读写块属性）  
+- **新增文件**: `src/srs/types.ts`（`Grade`、`SrsState`、`ReviewCard` 类型定义）。
+
+### 1. 真实复习队列（替换 demo 数据）
+- `SrsReviewSessionDemo.tsx` 接收真实队列 `cards: ReviewCard[]`，评分按钮调用 `updateSrsState`（load → nextReviewState → save），实时展示 due/间隔/稳定度的日志提示。  
+- 队列构建：`startReviewSession` 读取所有卡片，过滤到期旧卡（`srs.due <= 今天`）与新卡（未复习/无 lastReviewed），按 2 旧 1 新交织传给复习组件；空队列时提示“今天没有到期或新卡”。
+
+### 2. 初始/扫描写入完整 FSRS 属性
+- 扫描与手动转换都会写入：`srs.stability`、`srs.difficulty`、`srs.lastReviewed`、`srs.interval`、`srs.due`、`srs.reps`、`srs.lapses`（使用 ts-fsrs 初始值）。  
+- 评分更新同样写回这些字段，供 UI 与日志使用。
+
+### 3. 块渲染器接入真实评分
+- `SrsCardBlockRenderer.tsx` 评分直接调用 `updateSrsState`，并在卡片底部显示当前 due/间隔/稳定度/难度/复习次数/遗忘次数。
+
+### 4. Bug 修复
+- 再次扫描/启动复习时，因 `orca.state.blocks` 中空位导致 `_repr` 读取报错的问题已过滤空值。
 
 ---
 
@@ -32,8 +55,10 @@
 type SrsCardDemoProps = {
   front: string                                      // 题目文本
   back: string                                       // 答案文本
-  onGrade: (grade: "again" | "hard" | "good" | "easy") => void  // 评分回调
+  onGrade: (grade: Grade) => Promise<void> | void    // 评分回调（已接入 FSRS 更新）
   onClose?: () => void                               // 关闭回调
+  srsInfo?: Partial<SrsState>                        // 显示 due/间隔/稳定度/难度/复习次数
+  isGrading?: boolean                                // 写入中禁用按钮
 }
 ```
 
@@ -53,50 +78,26 @@ type SrsCardDemoProps = {
 **文件位置**: `src/components/SrsReviewSessionDemo.tsx`
 
 **功能**:
-- 管理一组卡片的复习会话
-- 内置 5 张假数据卡片 (涵盖量子物理、计算机科学等主题)
-- 逐张显示卡片，用户评分后自动切换到下一张
-- 所有卡片复习完毕后显示完成页面
+- 接收真实队列 `cards: ReviewCard[]`（入口 `startReviewSession` 按 2 旧 1 新交织）
+- 评分按钮调用 `updateSrsState`（读 → 算 → 写），日志展示返回的 due/间隔/稳定度
+- 完成后通知“共复习 N 张”，空队列时提示“今天没有到期或新卡”
 
 **核心状态**:
 ```typescript
 const [currentIndex, setCurrentIndex] = useState(0)      // 当前卡片索引
 const [reviewedCount, setReviewedCount] = useState(0)    // 已复习数量
 ```
-
-**假数据结构**:
-```typescript
-type Card = {
-  id: number      // 卡片 ID
-  front: string   // 题目
-  back: string    // 答案
-}
-
-const demoCards: Card[] = [
-  { id: 1, front: "What is quantum entanglement?", back: "..." },
-  { id: 2, front: "What is superposition?", back: "..." },
-  { id: 3, front: "什么是时间复杂度？", back: "..." },
-  { id: 4, front: "什么是闭包（Closure）？", back: "..." },
-  { id: 5, front: "What is the difference between let and const?", back: "..." }
-]
-```
+（队列由入口提供，无内置假数据）
 
 **交互流程**:
-1. 显示当前卡片 (复用 `SrsCardDemo` 组件)
-2. 用户评分 → 触发 `handleGrade(grade)`
-   - 打印控制台日志: `[SRS Review Session] 卡片 #X 评分: XXX`
-   - 更新已复习计数
-   - 300ms 延迟后切换到下一张
-3. 所有卡片完成 → 显示完成页面
+1. 显示当前卡片 (复用 `SrsCardDemo`)
+2. 评分 → 写入 FSRS 状态 → 250ms 切换下一张
+3. 全部完成 → 完成页（✅ 图标、统计数字、完成按钮）
 
 **UI 特性**:
-- **顶部进度条**: 显示复习进度 (0% → 100%)
-- **进度文字**: "卡片 X / 5" 居中悬浮显示
-- **完成页面**:
-  - 图标: 🎉
-  - 统计: "共复习了 X 张卡片"
-  - 鼓励文案: "坚持复习，持续进步！"
-  - 完成按钮
+- 顶部进度条 + 进度提示（显示“到期 X | 新卡 Y”统计）
+- 最近一次评分的小提示气泡（展示 due/间隔/稳定度）
+- 完成页面：✅ 图标 + 统计数字 + 完成按钮
 
 ---
 
@@ -111,7 +112,7 @@ const demoCards: Card[] = [
 - 显示题目区域（`_repr.front`）
 - 可展开显示答案区域（`_repr.back`）
 - 提供 4 个评分按钮（Again / Hard / Good / Easy）
-- 评分按钮点击后输出到控制台（后续将接入 SRS 算法）
+- 评分按钮直接调用 `updateSrsState`，写回 due/间隔/稳定度/难度/复习次数，并提示到期信息
 
 **Props 接口**:
 ```typescript
@@ -135,7 +136,7 @@ type SrsCardBlockRendererProps = {
 - **卡片标识**: 卡片图标 + "SRS 记忆卡片" 文字
 - **题目区域**: 灰色背景框
 - **答案区域**: 灰色背景框 + 蓝色左边框
-- **评分按钮**: 4 列网格布局（与 SrsCardDemo 一致）
+- **评分按钮**: 4 列网格布局（与 SrsCardDemo 一致），下方展示当前 SRS 状态
 
 **技术实现**:
 - 使用 `BlockShell` 包装组件（Orca 标准做法）
@@ -215,15 +216,17 @@ async function scanCardsFromTags() {
    }
    ```
 
-2. **SRS 属性设置**：
+2. **SRS 属性设置**（使用 `writeInitialSrsState` + ts-fsrs 初始值）：
    ```typescript
    [
-     { name: "srs.isCard", value: true, type: 4 },       // Boolean
-     { name: "srs.due", value: new Date(), type: 5 },    // DateTime
-     { name: "srs.interval", value: 1, type: 3 },        // Number
-     { name: "srs.ease", value: 2.5, type: 3 },          // Number
-     { name: "srs.reps", value: 0, type: 3 },            // Number
-     { name: "srs.lapses", value: 0, type: 3 }           // Number
+     { name: "srs.isCard", value: true, type: 4 },
+     { name: "srs.stability", value: S0, type: 3 },
+     { name: "srs.difficulty", value: D0, type: 3 },
+     { name: "srs.lastReviewed", value: null, type: 5 },
+     { name: "srs.interval", value: 0, type: 3 },
+     { name: "srs.due", value: now, type: 5 },
+     { name: "srs.reps", value: 0, type: 3 },
+     { name: "srs.lapses", value: 0, type: 3 }
    ]
    ```
 
@@ -361,7 +364,7 @@ orca.converters.registerBlock(
 #### 7. 启动复习会话逻辑
 - 创建 DOM 容器: `<div id="srs-review-session-container">`
 - 使用 React 18 的 `createRoot` API 渲染组件
-- 显示 Orca 通知: "复习会话已开始，共 5 张卡片"
+- 显示 Orca 通知: "复习会话已开始，到期 X 张，新卡 Y 张"（实时统计）
 
 #### 8. 清理逻辑 (unload)
 - 卸载 React root
@@ -458,30 +461,20 @@ npm run build
 **预期行为**:
 
 1. **启动阶段**
-   - 显示通知: "复习会话已开始，共 5 张卡片"
-   - 出现顶部进度条 (蓝色)
-   - 显示进度文字: "卡片 1 / 5"
-   - 显示第一张卡片题目
+- 显示通知: "复习会话已开始，到期 X 张，新卡 Y 张"
+   - 出现顶部进度条 (蓝色)，进度文字基于真实队列长度
+   - 显示第一张真实卡片题目
 
-2. **复习第 1 张卡片**
-   - 题目: "What is quantum entanglement?"
-   - 点击 "显示答案" → 看到答案内容
-   - 点击评分 (例如 `Good`)
-   - **控制台输出**: `[SRS Review Session] 卡片 #1 评分: good`
-   - 300ms 后自动切换到第 2 张
+2. **复习过程**
+   - 点击评分（Again/Hard/Good/Easy）→ 立即写入 FSRS 状态
+   - **控制台输出示例**: `评分 GOOD -> 下次 2025-12-08 09:00:00，间隔 1 天，稳定度 1.23`
+   - 进度条与计数递增，最近评分提示显示 due/间隔/稳定度
 
-3. **复习第 2-5 张卡片**
-   - 重复相同流程
-   - 观察进度条逐渐填满
-   - 进度文字更新: "卡片 2 / 5" → ... → "卡片 5 / 5"
-
-4. **完成阶段**
-   - 最后一张评分后,自动显示完成页面
-   - 看到 🎉 图标
-   - 文字: "本次复习结束！共复习了 5 张卡片"
-   - 点击 "完成" 按钮
-   - **控制台输出**: `[SRS Review Session] 本次复习会话结束，共复习 5 张卡片`
-   - 显示通知: "本次复习完成！共复习了 5 张卡片"
+3. **完成阶段**
+   - 队列耗尽后显示 ✅ 完成页面
+   - 文字: "本次复习结束！共复习了 N 张卡片"
+   - **控制台输出**: `[SRS Review Session] 本次复习会话结束，共复习 N 张卡片`
+   - 显示通知: "本次复习完成！共复习了 N 张卡片"
    - 界面关闭
 
 ### 6. 查看调试日志
@@ -1031,16 +1024,10 @@ function myFunction(paramName: string): void {
 
 ## 🐛 已知问题和限制
 
-### 当前阶段限制
-1. **仅使用假数据** - 未连接 Orca 后端
-2. **无数据持久化** - 刷新后进度丢失
-3. **无 SRS 算法** - 评分不影响复习间隔
-4. **无卡片创建功能** - 不能从 Orca 块创建卡片
-
-### 技术限制
-1. **需要 Orca 环境** - 无法在浏览器中独立运行
-2. **依赖全局 React** - 必须在 Orca 提供的环境中运行
-3. **热重载不支持** - 修改代码后需要重新构建和重启插件
+1. 未提供 deck/标签筛选与排序；当前扫描全局卡片按 2 旧 1 新交织。
+2. 未设置每日新卡/旧卡配额与上限，长队列可能一次性全部进入会话。
+3. 尚未展示复习历史/统计面板，仅在通知/日志中提示。
+4. 错误提示主要在通知/控制台，后续可在 UI 中内嵌反馈。
 
 ---
 
@@ -1095,18 +1082,16 @@ function myFunction(paramName: string): void {
 
 ---
 
-**最后更新**: 2025-01-11
+**最后更新**: 2025-12-07
 **当前状态**:
-- ✅ 阶段 1 完成 (前端 UI 使用假数据)
-- ✅ 阶段 5 部分完成 (自定义卡片渲染器)
-  - ✅ 块渲染器实现
-  - ✅ 转换命令实现
-  - ✅ 支持撤销/重做
-  - ⏸ SRS 状态显示（待实现）
-- ✅ **新增功能**：通过标签自动识别卡片
-  - ✅ 扫描 #card 标签功能
-  - ✅ 自动提取题目和答案
-  - ✅ 支持 #deck/xxx 分组标签
-  - ✅ 自动设置初始 SRS 属性
+- ✅ 阶段 1 完成 (前端 UI)
+- ✅ 阶段 2/3 完成 (FSRS 算法 + 存储读写，ts-fsrs 默认参数)
+- ✅ 阶段 6 已接通真实数据（到期/新卡队列，2 旧 1 新）
+- ✅ 标签扫描/手动转换写入完整 FSRS 属性；复习评分写回 FSRS 字段
+- ✅ 块渲染器评分接入 FSRS，底部展示当前 SRS 状态
+- ✅ 修复重复扫描/复习因空块导致 `_repr` 报错的问题
 
-**下一步**: 🚧 阶段 2 - 实现 SRS 算法模块
+**下一步**:
+1. 支持 deck/标签筛选与排序；增加每日新卡/旧卡上限配置。
+2. 在复习界面展示复习统计与历史记录，允许查看/撤销最近评分。
+3. 完善错误提示与加载态（队列构建、评分保存）。

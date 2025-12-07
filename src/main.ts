@@ -3,6 +3,8 @@ import zhCN from "./translations/zhCN"
 import SrsReviewSessionDemo from "./components/SrsReviewSessionDemo"
 import SrsCardBlockRenderer from "./components/SrsCardBlockRenderer"
 import type { BlockForConversion, Repr, CursorData, DbId, Block } from "./orca.d.ts"
+import { loadCardSrsState, writeInitialSrsState } from "./srs/storage"
+import type { ReviewCard } from "./srs/types"
 
 // 扩展 Block 类型以包含 _repr 属性（运行时存在但类型定义中缺失）
 type BlockWithRepr = Block & { _repr?: Repr }
@@ -32,9 +34,9 @@ export async function load(_name: string) {
   // 命令：开始 SRS 复习会话
   orca.commands.registerCommand(
     `${pluginName}.startReviewSession`,
-    () => {
+    async () => {
       console.log(`[${pluginName}] 开始 SRS 复习会话`)
-      startReviewSession()
+      await startReviewSession()
     },
     "SRS: 开始复习"
   )
@@ -183,45 +185,53 @@ export async function unload() {
 // 辅助函数：开始复习会话
 // ========================================
 /**
- * 显示 SRS 复习会话组件
- * 使用假数据创建一个完整的复习会话
+ * 显示 SRS 复习会话组件（使用真实队列）
  */
-function startReviewSession() {
-  // 如果已经打开复习会话，先关闭
+async function startReviewSession() {
   if (reviewSessionContainer) {
     closeReviewSession()
   }
 
-  // 创建容器 div
-  reviewSessionContainer = document.createElement("div")
-  reviewSessionContainer.id = "srs-review-session-container"
-  document.body.appendChild(reviewSessionContainer)
+  try {
+    const cards = await collectReviewCards()
+    const queue = buildReviewQueue(cards)
 
-  // 获取 React 和 createRoot（从全局 window 对象）
-  const React = window.React
-  const { createRoot } = window
+    if (queue.length === 0) {
+      orca.notify("info", "今天没有需要复习的到期卡或新卡", { title: "SRS 复习" })
+      return
+    }
 
-  // 创建 React root
-  reviewSessionRoot = createRoot(reviewSessionContainer)
+    reviewSessionContainer = document.createElement("div")
+    reviewSessionContainer.id = "srs-review-session-container"
+    document.body.appendChild(reviewSessionContainer)
 
-  // 渲染复习会话组件
-  reviewSessionRoot.render(
-    React.createElement(SrsReviewSessionDemo, {
-      onClose: () => {
-        console.log(`[${pluginName}] 用户关闭复习会话`)
-        closeReviewSession()
-      }
-    })
-  )
+    const React = window.React
+    const { createRoot } = window
+    reviewSessionRoot = createRoot(reviewSessionContainer)
 
-  console.log(`[${pluginName}] SRS 复习会话已开始`)
+    reviewSessionRoot.render(
+      React.createElement(SrsReviewSessionDemo, {
+        cards: queue,
+        onClose: () => {
+          console.log(`[${pluginName}] 用户关闭复习会话`)
+          closeReviewSession()
+        }
+      })
+    )
 
-  // 显示通知
-  orca.notify(
-    "info",
-    "复习会话已开始，共 5 张卡片",
-    { title: "SRS 复习" }
-  )
+    const dueCount = queue.filter(card => !card.isNew).length
+    const newCount = queue.filter(card => card.isNew).length
+
+    console.log(`[${pluginName}] SRS 复习会话已开始，队列 ${queue.length} 张（到期 ${dueCount} / 新卡 ${newCount}）`)
+    orca.notify(
+      "info",
+      `复习会话已开始，到期 ${dueCount} 张，新卡 ${newCount} 张`,
+      { title: "SRS 复习" }
+    )
+  } catch (error) {
+    console.error(`[${pluginName}] 启动复习失败:`, error)
+    orca.notify("error", `启动复习失败: ${error}`, { title: "SRS 复习" })
+  }
 }
 
 /**
@@ -240,6 +250,82 @@ function closeReviewSession() {
   }
 
   console.log(`[${pluginName}] SRS 复习会话已关闭`)
+}
+
+const isSrsCardBlock = (block: BlockWithRepr) =>
+  block._repr?.type === "srs.card" ||
+  block.properties?.some(prop => prop.name === "srs.isCard")
+
+const getFirstChildText = (block: BlockWithRepr) => {
+  if (!block?.children || block.children.length === 0) return "（无答案）"
+  const firstChildId = block.children[0]
+  const firstChild = orca.state.blocks?.[firstChildId] as BlockWithRepr | undefined
+  return firstChild?.text || "（无答案）"
+}
+
+const resolveFrontBack = (block: BlockWithRepr) => {
+  const front = block._repr?.front ?? block.text ?? "（无题目）"
+  const back = block._repr?.back ?? getFirstChildText(block)
+  return { front, back }
+}
+
+const collectSrsBlocks = async (): Promise<BlockWithRepr[]> => {
+  const tagged = (await orca.invokeBackend("get-blocks-with-tags", ["card"])) as BlockWithRepr[] | undefined
+  const stateBlocks = Object.values(orca.state.blocks || {})
+    .filter((b): b is BlockWithRepr => !!b && (b as BlockWithRepr)._repr?.type === "srs.card")
+
+  const merged = new Map<DbId, BlockWithRepr>()
+  for (const block of [...(tagged || []), ...stateBlocks]) {
+    if (!block) continue
+    merged.set(block.id, block as BlockWithRepr)
+  }
+  return Array.from(merged.values())
+}
+
+const collectReviewCards = async (): Promise<ReviewCard[]> => {
+  const blocks = await collectSrsBlocks()
+  const now = new Date()
+  const cards: ReviewCard[] = []
+
+  for (const block of blocks) {
+    if (!isSrsCardBlock(block)) continue
+    const { front, back } = resolveFrontBack(block)
+    const hasSrsProps = block.properties?.some(prop => prop.name.startsWith("srs."))
+    const srsState = hasSrsProps
+      ? await loadCardSrsState(block.id)
+      : await writeInitialSrsState(block.id, now)
+
+    cards.push({
+      id: block.id,
+      front,
+      back,
+      srs: srsState,
+      isNew: !srsState.lastReviewed || srsState.reps === 0
+    })
+  }
+
+  return cards
+}
+
+const buildReviewQueue = (cards: ReviewCard[]): ReviewCard[] => {
+  const today = new Date()
+  const dueCards = cards.filter(card => !card.isNew && card.srs.due.getTime() <= today.getTime())
+  const newCards = cards.filter(card => card.isNew)
+
+  const queue: ReviewCard[] = []
+  let dueIndex = 0
+  let newIndex = 0
+
+  while (dueIndex < dueCards.length || newIndex < newCards.length) {
+    for (let i = 0; i < 2 && dueIndex < dueCards.length; i++) {
+      queue.push(dueCards[dueIndex++])
+    }
+    if (newIndex < newCards.length) {
+      queue.push(newCards[newIndex++])
+    }
+  }
+
+  return queue
 }
 
 // ========================================
@@ -286,18 +372,7 @@ async function scanCardsFromTags() {
         continue
       }
 
-      // a. 读取父块内容作为题目（front）
-      const front = block.text || "（无题目）"
-
-      // b. 读取第一个子块内容作为答案（back）
-      let back = "（无答案）"
-      if (block.children && block.children.length > 0) {
-        const firstChildId = block.children[0]
-        const firstChild = orca.state.blocks[firstChildId]
-        if (firstChild && firstChild.text) {
-          back = firstChild.text
-        }
-      }
+      const { front, back } = resolveFrontBack(blockWithRepr)
 
       // c. 从标签中解析 deck 名称
       // 遍历 block.refs，找到标签引用（type === 2），检查是否是 deck 标签
@@ -325,26 +400,12 @@ async function scanCardsFromTags() {
       }
 
       // e. 设置初始 SRS 属性（如果块还没有这些属性）
-      // 检查块是否已有 SRS 属性
       const hasSrsProperties = block.properties?.some(
         prop => prop.name.startsWith("srs.")
       )
 
       if (!hasSrsProperties) {
-        // 设置初始 SRS 属性
-        await orca.commands.invokeEditorCommand(
-          "core.editor.setProperties",
-          null,
-          [block.id],
-          [
-            { name: "srs.isCard", value: true, type: 4 },        // type: 4 = Boolean
-            { name: "srs.due", value: new Date(), type: 5 },     // type: 5 = DateTime
-            { name: "srs.interval", value: 1, type: 3 },         // type: 3 = Number
-            { name: "srs.ease", value: 2.5, type: 3 },           // type: 3 = Number
-            { name: "srs.reps", value: 0, type: 3 },             // type: 3 = Number
-            { name: "srs.lapses", value: 0, type: 3 }            // type: 3 = Number
-          ]
-        )
+        await writeInitialSrsState(block.id)
       }
 
       console.log(`[${pluginName}] 已转换：块 #${block.id}`)
@@ -396,18 +457,7 @@ async function makeCardFromBlock(cursor: CursorData) {
   // 保存原始 _repr 供撤销使用
   const originalRepr = block._repr ? { ...block._repr } : { type: "text" }
 
-  // 获取题目：使用当前块的纯文本
-  const front = block.text || "（无题目）"
-
-  // 获取答案：使用第一个子块的纯文本（如果存在）
-  let back = "（无答案）"
-  if (block.children && block.children.length > 0) {
-    const firstChildId = block.children[0]
-    const firstChild = orca.state.blocks[firstChildId]
-    if (firstChild && firstChild.text) {
-      back = firstChild.text
-    }
-  }
+  const { front, back } = resolveFrontBack(block)
 
   // 直接修改块的 _repr（Valtio 会自动触发响应式更新）
   block._repr = {
@@ -415,6 +465,8 @@ async function makeCardFromBlock(cursor: CursorData) {
     front: front,
     back: back
   }
+
+  await writeInitialSrsState(blockId)
 
   console.log(`[${pluginName}] 块 #${blockId} 已转换为 SRS 卡片`)
   console.log(`  题目: ${front}`)

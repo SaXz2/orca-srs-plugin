@@ -1,115 +1,99 @@
 /**
- * SRS 复习会话演示组件
- *
- * 功能：
- * - 维护一组假数据卡片
- * - 依次显示每张卡片（复用 SrsCardDemo）
- * - 用户评分后自动切换到下一张
- * - 所有卡片复习完毕后显示结束界面
+ * SRS 复习会话组件（使用真实数据队列）
  */
-
-// 从全局 window 对象获取 React（Orca 插件约定）
-const { useState } = window.React
-const { Button, ModalOverlay } = orca.components
-
-// 导入单卡组件
+import type { Grade, ReviewCard } from "../srs/types"
+import { updateSrsState } from "../srs/storage"
 import SrsCardDemo from "./SrsCardDemo"
 
-// 卡片数据类型
-type Card = {
-  id: number
-  front: string
-  back: string
+// 从全局 window 对象获取 React（Orca 插件约定）
+const { useMemo, useState } = window.React
+const { Button, ModalOverlay } = orca.components
+
+type SrsReviewSessionProps = {
+  cards: ReviewCard[]
+  onClose?: () => void
 }
 
-// 组件 Props 类型定义
-type SrsReviewSessionDemoProps = {
-  onClose?: () => void  // 关闭回调
-}
-
-/**
- * 假数据：演示用的卡片列表
- */
-const demoCards: Card[] = [
-  {
-    id: 1,
-    front: "What is quantum entanglement?",
-    back: "Quantum entanglement is a physical phenomenon where pairs or groups of particles are generated or interact in ways such that the quantum state of each particle cannot be described independently of the state of the others, even when separated by large distances."
-  },
-  {
-    id: 2,
-    front: "What is superposition?",
-    back: "Superposition is the ability of a quantum system to be in multiple states at the same time until it is measured. For example, Schrödinger's cat is in a superposition of both alive and dead states until observed."
-  },
-  {
-    id: 3,
-    front: "什么是时间复杂度？",
-    back: "时间复杂度是算法执行所需时间与输入数据规模之间的关系，通常用大O表示法描述。例如 O(n) 表示线性时间，O(log n) 表示对数时间。"
-  },
-  {
-    id: 4,
-    front: "什么是闭包（Closure）？",
-    back: "闭包是指一个函数能够访问其外部作用域中的变量，即使外部函数已经执行完毕。闭包常用于数据封装和创建私有变量。"
-  },
-  {
-    id: 5,
-    front: "What is the difference between let and const in JavaScript?",
-    back: "'let' declares a variable that can be reassigned, while 'const' declares a constant reference that cannot be reassigned. However, for objects and arrays declared with const, their contents can still be modified."
-  }
-]
-
-export default function SrsReviewSessionDemo({
+export default function SrsReviewSession({
+  cards,
   onClose
-}: SrsReviewSessionDemoProps) {
-  // 状态：当前卡片索引（从 0 开始）
+}: SrsReviewSessionProps) {
+  const [queue, setQueue] = useState<ReviewCard[]>(cards)
   const [currentIndex, setCurrentIndex] = useState(0)
-
-  // 状态：已完成的卡片数量（用于统计）
   const [reviewedCount, setReviewedCount] = useState(0)
+  const [isGrading, setIsGrading] = useState(false)
+  const [lastLog, setLastLog] = useState<string | null>(null)
 
-  // 计算总卡片数
-  const totalCards = demoCards.length
-
-  // 获取当前卡片
-  const currentCard = demoCards[currentIndex]
-
-  // 判断是否已完成所有卡片
+  const totalCards = queue.length
+  const currentCard = queue[currentIndex]
   const isSessionComplete = currentIndex >= totalCards
 
-  /**
-   * 处理用户对当前卡片的评分
-   * @param grade 评分等级
-   */
-  const handleGrade = (grade: "again" | "hard" | "good" | "easy") => {
-    // 打印日志：卡片 id + 评分
-    console.log(`[SRS Review Session] 卡片 #${currentCard.id} 评分: ${grade}`)
+  const counters = useMemo(() => {
+    const now = Date.now()
+    let due = 0
+    let fresh = 0
+    for (const card of queue) {
+      if (card.isNew) {
+        fresh += 1
+      } else if (card.srs.due.getTime() <= now) {
+        due += 1
+      }
+    }
+    return { due, fresh }
+  }, [queue])
 
-    // 增加已复习计数
+  const handleGrade = async (grade: Grade) => {
+    if (!currentCard) return
+    setIsGrading(true)
+    const result = await updateSrsState(currentCard.id, grade)
+
+    const updatedCard: ReviewCard = { ...currentCard, srs: result.state, isNew: false }
+    const nextQueue = [...queue]
+    nextQueue[currentIndex] = updatedCard
+    setQueue(nextQueue)
+
+    setLastLog(
+      `评分 ${grade.toUpperCase()} -> 下次 ${result.state.due.toLocaleString()}，间隔 ${result.state.interval} 天，稳定度 ${result.state.stability.toFixed(2)}`
+    )
+
     setReviewedCount((prev: number) => prev + 1)
-
-    // 切换到下一张卡片
-    setTimeout(() => {
-      setCurrentIndex((prev: number) => prev + 1)
-    }, 300) // 延迟 300ms，让用户看到评分反馈
+    setIsGrading(false)
+    setTimeout(() => setCurrentIndex((prev: number) => prev + 1), 250)
   }
 
-  /**
-   * 处理复习会话结束后的操作
-   */
   const handleFinishSession = () => {
-    console.log(`[SRS Review Session] 本次复习会话结束，共复习 ${reviewedCount} 张卡片`)
+    console.log(`[SRS Review Session] 本次复习结束，共复习 ${reviewedCount} 张卡片`)
 
-    // 显示通知
     orca.notify(
       "success",
       `本次复习完成！共复习了 ${reviewedCount} 张卡片`,
       { title: "SRS 复习会话" }
     )
 
-    // 关闭会话
     if (onClose) {
       onClose()
     }
+  }
+
+  if (totalCards === 0) {
+    return (
+      <ModalOverlay visible={true} canClose={true} onClose={onClose}>
+        <div style={{
+          backgroundColor: 'var(--orca-color-bg-1)',
+          borderRadius: '12px',
+          padding: '32px',
+          maxWidth: '480px',
+          width: '90%',
+          textAlign: 'center'
+        }}>
+          <h3 style={{ marginBottom: '12px' }}>今天没有到期或新卡</h3>
+          <div style={{ color: 'var(--orca-color-text-2)', marginBottom: '20px' }}>
+            请先创建或等待卡片到期，然后再次开始复习
+          </div>
+          <Button variant="solid" onClick={onClose}>关闭</Button>
+        </div>
+      </ModalOverlay>
+    )
   }
 
   // ========================================
@@ -132,15 +116,13 @@ export default function SrsReviewSessionDemo({
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
           textAlign: 'center'
         }}>
-          {/* 完成图标 */}
           <div style={{
             fontSize: '64px',
             marginBottom: '24px'
           }}>
-            🎉
+            ✅
           </div>
 
-          {/* 标题 */}
           <h2 style={{
             fontSize: '24px',
             fontWeight: '600',
@@ -150,7 +132,6 @@ export default function SrsReviewSessionDemo({
             本次复习结束！
           </h2>
 
-          {/* 统计信息 */}
           <div style={{
             fontSize: '16px',
             color: 'var(--orca-color-text-2)',
@@ -161,7 +142,6 @@ export default function SrsReviewSessionDemo({
             <p style={{ marginTop: '8px' }}>坚持复习，持续进步！</p>
           </div>
 
-          {/* 完成按钮 */}
           <Button
             variant="solid"
             onClick={handleFinishSession}
@@ -214,8 +194,27 @@ export default function SrsReviewSessionDemo({
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
         zIndex: 10001
       }}>
-        卡片 {currentIndex + 1} / {totalCards}
+        卡片 {currentIndex + 1} / {totalCards}（到期 {counters.due} | 新卡 {counters.fresh}）
       </div>
+
+      {/* 最近一次评分日志 */}
+      {lastLog && (
+        <div style={{
+          position: 'fixed',
+          top: '48px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '6px 12px',
+          backgroundColor: 'var(--orca-color-bg-2)',
+          borderRadius: '12px',
+          fontSize: '12px',
+          color: 'var(--orca-color-text-2)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          zIndex: 10001
+        }}>
+          {lastLog}
+        </div>
+      )}
 
       {/* 当前卡片（复用 SrsCardDemo 组件） */}
       <SrsCardDemo
@@ -223,6 +222,8 @@ export default function SrsReviewSessionDemo({
         back={currentCard.back}
         onGrade={handleGrade}
         onClose={onClose}
+        srsInfo={currentCard.srs}
+        isGrading={isGrading}
       />
     </div>
   )

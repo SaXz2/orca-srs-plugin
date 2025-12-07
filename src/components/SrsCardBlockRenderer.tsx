@@ -13,7 +13,9 @@
  * - _repr.back: 答案文本
  */
 
-import type { Block, DbId } from "../orca.d.ts"
+import type { Block, BlockProperty, DbId } from "../orca.d.ts"
+import type { Grade } from "../srs/types"
+import { updateSrsState } from "../srs/storage"
 
 // 从全局 window 对象获取 React
 const { useState, useMemo } = window.React
@@ -49,6 +51,23 @@ export default function SrsCardBlockRenderer({
   const { blocks } = useSnapshot(orca.state)
   const block = blocks[mirrorId ?? blockId]
 
+  const readProp = (name: string) =>
+    block?.properties?.find((prop: BlockProperty) => prop.name === name)?.value
+
+  const srsInfo = useMemo(() => {
+    const dueRaw = readProp("srs.due")
+    const lastReviewed = readProp("srs.lastReviewed")
+    return {
+      stability: readProp("srs.stability"),
+      difficulty: readProp("srs.difficulty"),
+      interval: readProp("srs.interval"),
+      due: dueRaw ? new Date(dueRaw) : null,
+      lastReviewed: lastReviewed ? new Date(lastReviewed) : null,
+      reps: readProp("srs.reps"),
+      lapses: readProp("srs.lapses")
+    }
+  }, [block?.properties])
+
   // 状态：是否显示答案
   const [showAnswer, setShowAnswer] = useState(false)
 
@@ -56,14 +75,10 @@ export default function SrsCardBlockRenderer({
    * 处理评分按钮点击
    * @param grade 评分等级
    */
-  const handleGrade = (grade: "again" | "hard" | "good" | "easy") => {
-    console.log(
-      `[SRS Card Block Renderer] 卡片 #${blockId} 评分: ${grade}`
-    )
+  const handleGrade = async (grade: Grade) => {
+    console.log(`[SRS Card Block Renderer] 卡片 #${blockId} 评分: ${grade}`)
 
-    // TODO: 后续实现真实的 SRS 算法更新
-    // - 调用 SRS 算法计算下次复习时间
-    // - 更新块属性（srs.due, srs.interval, srs.ease 等）
+    const result = await updateSrsState(blockId, grade)
 
     // 评分后隐藏答案
     setShowAnswer(false)
@@ -71,7 +86,7 @@ export default function SrsCardBlockRenderer({
     // 显示通知
     orca.notify(
       "success",
-      `评分已记录：${grade}`,
+      `评分已记录：${grade}，下次 ${result.state.due.toLocaleString()}（间隔 ${result.state.interval} 天）`,
       { title: "SRS 复习" }
     )
   }
@@ -270,7 +285,11 @@ export default function SrsCardBlockRenderer({
       )}
 
       {/* TODO: 未来这里可以显示 SRS 状态信息 */}
-      {/* 例如：下次复习时间、已复习次数、复习间隔等 */}
+      <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--orca-color-text-2)" }}>
+        <div>下次复习：{srsInfo.due ? srsInfo.due.toLocaleString() : "未安排"}</div>
+        <div>间隔：{srsInfo.interval ?? "-"} 天，稳定度：{srsInfo.stability ?? "-"}，难度：{srsInfo.difficulty ?? "-"}</div>
+        <div>复习次数：{srsInfo.reps ?? 0}，遗忘：{srsInfo.lapses ?? 0}</div>
+      </div>
     </div>
   )
 
