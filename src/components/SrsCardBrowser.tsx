@@ -9,7 +9,7 @@
 
 import type { Block, DbId, Repr } from "../orca.d.ts"
 
-const { useState, useEffect, useMemo } = window.React
+const { useState, useEffect, useMemo, useCallback } = window.React
 const { useSnapshot } = window.Valtio
 const { ModalOverlay, Button } = orca.components
 
@@ -110,19 +110,61 @@ function getDueColor(filterType: FilterType): string {
 export default function SrsCardBrowser({ onClose }: SrsCardBrowserProps) {
   const { blocks } = useSnapshot(orca.state)
   const [currentFilter, setCurrentFilter] = useState<FilterType>("all")
+  const [remoteBlocks, setRemoteBlocks] = useState<BlockWithRepr[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const refreshRemoteBlocks = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError(null)
+    try {
+      const fetched = (await orca.invokeBackend("get-blocks-with-tags", ["card"])) as BlockWithRepr[] | undefined
+      if (Array.isArray(fetched)) {
+        setRemoteBlocks(fetched.filter((block): block is BlockWithRepr => !!block))
+      } else {
+        setRemoteBlocks([])
+      }
+    } catch (error) {
+      console.error("[SrsCardBrowser] 加载卡片列表失败", error)
+      setLoadError("加载卡片列表失败，请稍后再试")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshRemoteBlocks()
+  }, [refreshRemoteBlocks])
+
+  const isSrsCardBlock = useCallback((block: BlockWithRepr | undefined): block is BlockWithRepr => {
+    if (!block) {
+      return false
+    }
+    if (block._repr?.type === "srs.card") {
+      return true
+    }
+    return block.properties?.some((prop) => prop.name === "srs.isCard") ?? false
+  }, [])
 
   // 加载所有 SRS 卡片
   const allCards = useMemo<CardInfo[]>(() => {
     const cardList: CardInfo[] = []
+    const merged = new Map<DbId, BlockWithRepr>()
+
+    remoteBlocks.forEach((block: BlockWithRepr) => {
+      if (isSrsCardBlock(block)) {
+        merged.set(block.id, block)
+      }
+    })
 
     for (const blockId in blocks) {
       const block = blocks[blockId] as BlockWithRepr | undefined
-      if (!block) continue
+      if (block && isSrsCardBlock(block)) {
+        merged.set(block.id, block)
+      }
+    }
 
-      // 检查是否是 SRS 卡片
-      if (block._repr?.type !== "srs.card") continue
-
-      // 从块属性中读取 SRS 状态
+    merged.forEach((block) => {
       const lastReviewedProp = block.properties?.find((p) => p.name === "srs.lastReviewed")
       const dueProp = block.properties?.find((p) => p.name === "srs.due")
       const repsProp = block.properties?.find((p) => p.name === "srs.reps")
@@ -133,18 +175,18 @@ export default function SrsCardBrowser({ onClose }: SrsCardBrowserProps) {
 
       cardList.push({
         blockId: block.id,
-        front: (block._repr as any).front || "（无题目）",
+        front: (block._repr as any)?.front || block.text || "（无题目）",
         lastReviewed,
         due,
         reps,
       })
-    }
+    })
 
     // 按下次复习时间排序（最早到期的在前）
     cardList.sort((a, b) => a.due.getTime() - b.due.getTime())
 
     return cardList
-  }, [blocks])
+  }, [blocks, remoteBlocks, isSrsCardBlock])
 
   // 根据筛选条件过滤卡片
   const filteredCards = useMemo(() => {
@@ -244,7 +286,22 @@ export default function SrsCardBrowser({ onClose }: SrsCardBrowserProps) {
             padding: "16px",
           }}
         >
-          {filteredCards.length === 0 ? (
+          {loadError ? (
+            <div
+              style={{
+                textAlign: "center",
+                color: "var(--orca-color-danger-7)",
+                padding: "40px 20px",
+              }}
+            >
+              {loadError}
+              <div style={{ marginTop: "12px" }}>
+                <Button variant="soft" onClick={refreshRemoteBlocks}>
+                  重试
+                </Button>
+              </div>
+            </div>
+          ) : filteredCards.length === 0 ? (
             <div
               style={{
                 textAlign: "center",
@@ -252,7 +309,7 @@ export default function SrsCardBrowser({ onClose }: SrsCardBrowserProps) {
                 padding: "40px 20px",
               }}
             >
-              没有找到卡片
+              {isLoading ? "正在加载卡片..." : "没有找到卡片"}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
