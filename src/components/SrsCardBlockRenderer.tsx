@@ -18,7 +18,7 @@ import type { Grade } from "../srs/types"
 import { updateSrsState } from "../srs/storage"
 
 // 从全局 window 对象获取 React
-const { useState, useMemo } = window.React
+const { useState, useMemo, useEffect } = window.React
 const { useSnapshot } = window.Valtio
 const { BlockShell, BlockChildren, Button } = orca.components
 
@@ -49,7 +49,8 @@ export default function SrsCardBlockRenderer({
   back,
 }: SrsCardBlockRendererProps) {
   const { blocks } = useSnapshot(orca.state)
-  const block = blocks[mirrorId ?? blockId]
+  const targetBlockId = mirrorId ?? blockId
+  const block = blocks[targetBlockId]
 
   const readProp = (name: string) =>
     block?.properties?.find((prop: BlockProperty) => prop.name === name)?.value
@@ -70,6 +71,28 @@ export default function SrsCardBlockRenderer({
 
   // 状态：是否显示答案
   const [showAnswer, setShowAnswer] = useState(false)
+  const [isEditingFront, setIsEditingFront] = useState(false)
+  const [isEditingBack, setIsEditingBack] = useState(false)
+  const [editedFront, setEditedFront] = useState(front)
+  const [editedBack, setEditedBack] = useState(back)
+  const [frontDisplay, setFrontDisplay] = useState(front)
+  const [backDisplay, setBackDisplay] = useState(back)
+  const [isSavingFront, setIsSavingFront] = useState(false)
+  const [isSavingBack, setIsSavingBack] = useState(false)
+
+  const toFragments = (textValue: string) => [{ t: "t", v: textValue ?? "" }]
+
+  useEffect(() => {
+    setFrontDisplay(front)
+    setEditedFront(front)
+    setIsEditingFront(false)
+  }, [front])
+
+  useEffect(() => {
+    setBackDisplay(back)
+    setEditedBack(back)
+    setIsEditingBack(false)
+  }, [back])
 
   /**
    * 处理评分按钮点击
@@ -89,6 +112,84 @@ export default function SrsCardBlockRenderer({
       `评分已记录：${grade}，下次 ${result.state.due.toLocaleString()}（间隔 ${result.state.interval} 天）`,
       { title: "SRS 复习" }
     )
+  }
+
+  const handleSaveFront = async () => {
+    if (isSavingFront) return
+    setIsSavingFront(true)
+    try {
+      await orca.commands.invokeEditorCommand(
+        "core.editor.setBlocksContent",
+        null,
+        [{ id: targetBlockId, content: toFragments(editedFront) }],
+        false
+      )
+
+      const liveBlock = orca.state.blocks?.[targetBlockId] as any
+      if (liveBlock) {
+        liveBlock.text = editedFront
+        if (liveBlock._repr) {
+          liveBlock._repr.front = editedFront
+        }
+      }
+
+      setFrontDisplay(editedFront)
+      setIsEditingFront(false)
+      orca.notify("success", "题目已保存", { title: "SRS 卡片" })
+    } catch (error) {
+      console.error("保存题目失败:", error)
+      orca.notify("error", `保存失败: ${error}`)
+    } finally {
+      setIsSavingFront(false)
+    }
+  }
+
+  const handleSaveBack = async () => {
+    if (isSavingBack) return
+    const answerId = block?.children?.[0]
+    if (answerId === undefined) {
+      orca.notify("warn", "该卡片没有子块，无法保存答案", { title: "SRS 卡片" })
+      return
+    }
+
+    setIsSavingBack(true)
+    try {
+      await orca.commands.invokeEditorCommand(
+        "core.editor.setBlocksContent",
+        null,
+        [{ id: answerId, content: toFragments(editedBack) }],
+        false
+      )
+
+      const answerBlock = orca.state.blocks?.[answerId] as any
+      if (answerBlock) {
+        answerBlock.text = editedBack
+      }
+
+      const liveBlock = orca.state.blocks?.[targetBlockId] as any
+      if (liveBlock && liveBlock._repr) {
+        liveBlock._repr.back = editedBack
+      }
+
+      setBackDisplay(editedBack)
+      setIsEditingBack(false)
+      orca.notify("success", "答案已保存", { title: "SRS 卡片" })
+    } catch (error) {
+      console.error("保存答案失败:", error)
+      orca.notify("error", `保存失败: ${error}`)
+    } finally {
+      setIsSavingBack(false)
+    }
+  }
+
+  const handleCancelEdit = (field: "front" | "back") => {
+    if (field === "front") {
+      setEditedFront(front)
+      setIsEditingFront(false)
+    } else {
+      setEditedBack(back)
+      setIsEditingBack(false)
+    }
   }
 
   // 渲染子块（如果有的话）
@@ -145,18 +246,64 @@ export default function SrsCardBlockRenderer({
           fontSize: "14px",
           fontWeight: "500",
           color: "var(--orca-color-text-1)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
         }}
       >
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             fontSize: "11px",
             color: "var(--orca-color-text-2)",
-            marginBottom: "6px",
           }}
         >
-          题目：
+          <span>题目：</span>
+          {!isEditingFront && (
+            <Button
+              variant="soft"
+              onClick={() => setIsEditingFront(true)}
+              style={{ padding: "2px 8px", fontSize: "11px" }}
+            >
+              <i className="ti ti-edit"></i> 编辑
+            </Button>
+          )}
         </div>
-        <div>{front || "（无题目）"}</div>
+        {isEditingFront ? (
+          <>
+            <textarea
+              value={editedFront}
+              onChange={(e) => setEditedFront(e.target.value)}
+              style={{
+                width: "100%",
+                minHeight: "80px",
+                padding: "8px",
+                fontSize: "14px",
+                borderRadius: "4px",
+                border: "1px solid var(--orca-color-border-1)",
+                resize: "vertical",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <Button variant="soft" onClick={() => handleCancelEdit("front")}>
+                取消
+              </Button>
+              <Button variant="solid" onClick={handleSaveFront}>
+                保存
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div style={{ whiteSpace: "pre-wrap" }}>{frontDisplay || "（无题目）"}</div>
+        )}
       </div>
 
       {/* 显示答案按钮 或 答案区域 */}
@@ -188,18 +335,64 @@ export default function SrsCardBlockRenderer({
               borderLeft: "3px solid var(--orca-color-primary-5)",
               fontSize: "14px",
               color: "var(--orca-color-text-1)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
             }}
           >
             <div
               style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
                 fontSize: "11px",
                 color: "var(--orca-color-text-2)",
-                marginBottom: "6px",
               }}
             >
-              答案：
+              <span>答案：</span>
+              {!isEditingBack && (
+                <Button
+                  variant="soft"
+                  onClick={() => setIsEditingBack(true)}
+                  style={{ padding: "2px 8px", fontSize: "11px" }}
+                >
+                  <i className="ti ti-edit"></i> 编辑
+                </Button>
+              )}
             </div>
-            <div>{back || "（无答案）"}</div>
+            {isEditingBack ? (
+              <>
+                <textarea
+                  value={editedBack}
+                  onChange={(e) => setEditedBack(e.target.value)}
+                  style={{
+                    width: "100%",
+                    minHeight: "80px",
+                    padding: "8px",
+                    fontSize: "14px",
+                    borderRadius: "4px",
+                    border: "1px solid var(--orca-color-border-1)",
+                    resize: "vertical",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <Button variant="soft" onClick={() => handleCancelEdit("back")}>
+                    取消
+                  </Button>
+                  <Button variant="solid" onClick={handleSaveBack}>
+                    保存
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div style={{ whiteSpace: "pre-wrap" }}>{backDisplay || "（无答案）"}</div>
+            )}
           </div>
 
           {/* 评分按钮组 */}
