@@ -20,4 +20,23 @@ export type ReviewCard = {
   back: string
   srs: SrsState
   isNew: boolean
+  deck: string  // 修改：从 deck?: string 改为必填
+}
+
+// Deck 统计信息
+export type DeckInfo = {
+  name: string              // deck 名称
+  totalCount: number        // 总卡片数
+  newCount: number          // 新卡数
+  overdueCount: number      // 已到期数
+  todayCount: number        // 今天到期数
+  futureCount: number       // 未来到期数
+}
+
+// 全局统计
+export type DeckStats = {
+  decks: DeckInfo[]
+  totalCards: number
+  totalNew: number
+  totalOverdue: number
 }
