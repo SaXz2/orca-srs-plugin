@@ -12,6 +12,7 @@ import type { ReviewCard, DeckInfo, DeckStats } from "./srs/types"
 type BlockWithRepr = Block & { _repr?: Repr }
 
 let pluginName: string
+let reviewHostPanelId: string | null = null
 
 /**
  * 去除文本中的 # 标签，用于展示时的视觉过滤
@@ -253,6 +254,8 @@ async function startReviewSession(deckName?: string) {
       return
     }
 
+    reviewHostPanelId = activePanelId
+
     let rightPanelId = findRightPanel(orca.state.panels, activePanelId)
 
     if (!rightPanelId) {
@@ -289,6 +292,10 @@ async function startReviewSession(deckName?: string) {
     console.error(`[${pluginName}] 启动复习失败:`, error)
     orca.notify("error", `启动复习失败: ${error}`, { title: "SRS 复习" })
   }
+}
+
+export function getReviewHostPanelId(): string | null {
+  return reviewHostPanelId
 }
 
 function findRightPanel(node: any, currentPanelId: string): string | null {

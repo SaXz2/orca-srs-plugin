@@ -58,15 +58,22 @@ export default function SrsReviewSessionRenderer(props: RendererProps) {
     orca.nav.close(panelId)
   }
 
-  const handleJumpToCard = (cardBlockId: DbId) => {
-    const leftPanelId = findLeftPanel(orca.state.panels, panelId)
-    if (leftPanelId) {
-      orca.nav.goTo("block", { blockId: cardBlockId }, leftPanelId)
-      orca.nav.switchFocusTo(leftPanelId)
-      orca.notify("info", "已在左侧面板打开卡片", { title: "SRS 复习" })
-    } else {
+  const handleJumpToCard = async (cardBlockId: DbId) => {
+    try {
+      const { getReviewHostPanelId } = await import("../main")
+      const hostPanelId = typeof getReviewHostPanelId === "function" ? getReviewHostPanelId() : null
+
+      if (hostPanelId) {
+        orca.nav.goTo("block", { blockId: cardBlockId }, hostPanelId)
+        orca.nav.switchFocusTo(hostPanelId)
+        orca.notify("info", "已在主面板打开卡片", { title: "SRS 复习" })
+      } else {
+        orca.nav.goTo("block", { blockId: cardBlockId })
+        orca.notify("info", "已在当前面板打开卡片", { title: "SRS 复习" })
+      }
+    } catch (error) {
+      console.error("[SRS Review Session Renderer] 跳转到卡片失败:", error)
       orca.nav.goTo("block", { blockId: cardBlockId })
-      orca.notify("warn", "未找到左侧面板，已在当前面板打开", { title: "SRS 复习" })
     }
   }
 
@@ -133,43 +140,4 @@ export default function SrsReviewSessionRenderer(props: RendererProps) {
       childrenJsx={null}
     />
   )
-}
-
-function findLeftPanel(node: any, currentPanelId: string): string | null {
-  if (!node) return null
-
-  if (node.type === "hsplit" && node.children?.length === 2) {
-    const [leftPanel, rightPanel] = node.children
-    if (containsPanel(rightPanel, currentPanelId)) {
-      return typeof leftPanel?.id === "string" ? leftPanel.id : extractPanelId(leftPanel)
-    }
-  }
-
-  if (node.children) {
-    for (const child of node.children) {
-      const result = findLeftPanel(child, currentPanelId)
-      if (result) return result
-    }
-  }
-
-  return null
-}
-
-function containsPanel(node: any, panelId: string): boolean {
-  if (!node) return false
-  if (node.id === panelId) return true
-  if (!node.children) return false
-  return node.children.some((child: any) => containsPanel(child, panelId))
-}
-
-function extractPanelId(node: any): string | null {
-  if (!node) return null
-  if (typeof node.id === "string") return node.id
-  if (node.children && node.children.length > 0) {
-    for (const child of node.children) {
-      const result = extractPanelId(child)
-      if (result) return result
-    }
-  }
-  return null
 }
