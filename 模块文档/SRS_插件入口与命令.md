@@ -56,12 +56,15 @@ flowchart TD
 
 ### 斜杠命令
 
-| 命令 ID                  | 标题             | 关联命令           |
-| ------------------------ | ---------------- | ------------------ |
-| `${pluginName}.review`   | 开始 SRS 复习    | startReviewSession |
-| `${pluginName}.makeCard` | 转换为记忆卡片   | makeCardFromBlock  |
-| `${pluginName}.scanTags` | 扫描带标签的卡片 | scanCardsFromTags  |
-| `${pluginName}.browser`  | 打开卡片浏览器   | openCardBrowser    |
+| 命令 ID                  | 标题           | 关联命令          | 说明                                 |
+| ------------------------ | -------------- | ----------------- | ------------------------------------ |
+| `${pluginName}.makeCard` | 转换为记忆卡片 | makeCardFromBlock | 自动添加 #card 标签并转换为 SRS 卡片 |
+
+**已移除的斜杠命令**：
+
+- ~~开始 SRS 复习~~ → 使用工具栏按钮或命令面板
+- ~~扫描带标签的卡片~~ → 使用命令面板
+- ~~打开卡片浏览器~~ → 使用工具栏按钮或命令面板
 
 ### 块渲染器
 
@@ -138,7 +141,9 @@ export async function unload() {
 ### 斜杠命令
 
 1. 在编辑器中输入 `/`
-2. 选择 SRS 分组下的命令
+2. 选择"转换为记忆卡片"
+   - 自动添加 `#card` 标签
+   - 立即转换为 SRS 卡片
 
 ### 工具栏
 

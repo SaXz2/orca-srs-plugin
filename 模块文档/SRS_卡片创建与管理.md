@@ -52,10 +52,34 @@ flowchart TD
 
 #### `makeCardFromBlock(cursor)`
 
-将当前光标所在块转换为卡片：
+将当前光标所在块转换为 SRS 卡片（一步到位）：
 
-- 支持撤销操作
-- 作为编辑器命令注册
+**实现逻辑**：
+
+1. 检查块是否已有 `#card` 标签引用
+2. 如无标签，使用 `core.editor.insertTag` 命令添加
+   - 创建真正的标签引用和 DOM 元素
+   - 利用 Orca 官方 API 确保标签正确渲染
+3. 设置 `_repr.type = "srs.card"` 完成转换
+4. 初始化 SRS 状态
+
+**关键技术**：
+
+```typescript
+// 使用 Orca 官方命令添加标签
+await orca.commands.invokeEditorCommand(
+  "core.editor.insertTag",
+  cursor,
+  blockId,
+  "card"
+);
+```
+
+**特性**：
+
+- ✓ 自动添加真正的 #card 标签（可交互 DOM 元素）
+- ✓ 支持撤销操作
+- ✓ 作为编辑器命令注册
 
 #### `extractDeckName(block): string`
 
@@ -95,17 +119,31 @@ block.refs[].data[].value // Deck 名称
 
 ## 使用场景
 
-### 1. 手动创建卡片
+### 1. 手动创建卡片（推荐）
 
 1. 在块中输入题目
 2. 创建子块输入答案
-3. 使用斜杠命令 `/srs-card` 转换
+3. 使用斜杠命令"转换为记忆卡片"
+   - 自动添加 `#card` 标签
+   - 立即完成转换
 
 ### 2. 批量扫描
 
-1. 为多个块添加 `#card` 标签
+1. 手动为多个块添加 `#card` 标签
 2. 使用命令 "SRS: 扫描带标签的卡片"
 3. 自动转换所有带标签的块
+
+## 技术要点
+
+### 标签添加最佳实践
+
+- **推荐方式**：使用 `core.editor.insertTag` 命令
+  - 创建真正的标签引用（`block.refs`）
+  - 自动渲染为可交互的 DOM 元素
+  - Orca 官方支持的标准方法
+- **不推荐**：直接修改 `block.text` 添加 "#card" 文本
+  - 不会创建标签引用
+  - 界面无法渲染为标签
 
 ## 扩展点
 

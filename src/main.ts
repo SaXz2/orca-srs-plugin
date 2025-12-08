@@ -87,7 +87,7 @@ export async function load(_name: string) {
       const result = await makeCardFromBlock(cursor)
       return result ? { ret: result, undoArgs: result } : null
     },
-    // undo 函数：撤销转换（恢复原始 _repr）
+    // undo 函数：撤销转换（恢复原始 _repr 和文本）
     async (undoArgs: any) => {
       if (!undoArgs || !undoArgs.blockId) return
 
@@ -96,6 +96,11 @@ export async function load(_name: string) {
 
       // 恢复原始 _repr
       block._repr = undoArgs.originalRepr || { type: "text" }
+
+      // 恢复原始文本（如果有的话）
+      if (undoArgs.originalText !== undefined) {
+        block.text = undoArgs.originalText
+      }
 
       console.log(`[${pluginName}] 已撤销：块 #${undoArgs.blockId} 已恢复`)
     },
@@ -124,36 +129,12 @@ export async function load(_name: string) {
   // 3. 注册斜杠命令
   // ========================================
 
-  // 斜杠命令：开始复习
-  orca.slashCommands.registerSlashCommand(`${pluginName}.review`, {
-    icon: "ti ti-cards",
-    group: "SRS",
-    title: "开始 SRS 复习",
-    command: `${pluginName}.startReviewSession`
-  })
-
   // 斜杠命令：转换为 SRS 卡片
   orca.slashCommands.registerSlashCommand(`${pluginName}.makeCard`, {
     icon: "ti ti-card-plus",
     group: "SRS",
     title: "转换为记忆卡片",
     command: `${pluginName}.makeCardFromBlock`
-  })
-
-  // 斜杠命令：扫描带标签的卡片
-  orca.slashCommands.registerSlashCommand(`${pluginName}.scanTags`, {
-    icon: "ti ti-scan",
-    group: "SRS",
-    title: "扫描带标签的卡片",
-    command: `${pluginName}.scanCardsFromTags`
-  })
-
-  // 斜杠命令：打开卡片浏览器
-  orca.slashCommands.registerSlashCommand(`${pluginName}.browser`, {
-    icon: "ti ti-list",
-    group: "SRS",
-    title: "打开卡片浏览器",
-    command: `${pluginName}.openCardBrowser`
   })
 
   // ========================================
@@ -222,10 +203,7 @@ export async function unload() {
   orca.toolbar.unregisterToolbarButton(`${pluginName}.browserButton`)
 
   // 移除斜杠命令
-  orca.slashCommands.unregisterSlashCommand(`${pluginName}.review`)
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.makeCard`)
-  orca.slashCommands.unregisterSlashCommand(`${pluginName}.scanTags`)
-  orca.slashCommands.unregisterSlashCommand(`${pluginName}.browser`)
 
   // 移除块渲染器
   orca.renderers.unregisterBlock("srs.card")
@@ -782,6 +760,8 @@ async function scanCardsFromTags() {
 // ========================================
 /**
  * 将当前块转换为 SRS 卡片块
+ * - 使用官方的 insertTag 命令添加 #card 标签（创建真正的标签DOM元素）
+ * - 直接将块转换为 SRS 卡片
  * - 当前块的文本作为题目（front）
  * - 第一个子块的文本作为答案（back），如果没有子块则使用默认答案
  *
@@ -789,25 +769,73 @@ async function scanCardsFromTags() {
  * @returns 转换结果（包含 blockId 和原始 _repr，供 undo 使用）
  */
 async function makeCardFromBlock(cursor: CursorData) {
+  console.log(`[${pluginName}] ========== makeCardFromBlock 开始执行 ==========`)
+  
   if (!cursor || !cursor.anchor || !cursor.anchor.blockId) {
-    orca.notify("error", "无法获取当前块位置")
+    orca.notify("error", "无法获取光标位置")
+    console.error(`[${pluginName}] 错误：无法获取光标位置`)
     return null
   }
 
   const blockId = cursor.anchor.blockId
+  console.log(`[${pluginName}] blockId: ${blockId}`)
+  
   const block = orca.state.blocks[blockId] as BlockWithRepr
 
   if (!block) {
     orca.notify("error", "未找到当前块")
+    console.error(`[${pluginName}] 错误：未找到块 #${blockId}`)
     return null
   }
 
-  // 保存原始 _repr 供撤销使用
-  const originalRepr = block._repr ? { ...block._repr } : { type: "text" }
+  console.log(`[${pluginName}] 原始块文本: "${block.text}"`)
+  console.log(`[${pluginName}] 原始块 _repr:`, block._repr)
+  console.log(`[${pluginName}] 原始块 refs:`, block.refs)
 
+  // 保存原始 _repr 和文本供撤销使用
+  const originalRepr = block._repr ? { ...block._repr } : { type: "text" }
+  const originalText = block.text || ""
+
+  // 检查块是否已经有 #card 标签
+  const hasCardTag = block.refs?.some(ref => 
+    ref.type === 2 &&      // RefType.Property（标签引用）
+    ref.alias === "card"   // 标签名称为 "card"
+  )
+  
+  console.log(`[${pluginName}] 是否已有 #card 标签: ${hasCardTag}`)
+
+  // 如果没有标签，使用官方命令添加
+  if (!hasCardTag) {
+    try {
+      console.log(`[${pluginName}] 使用 core.editor.insertTag 添加 #card 标签`)
+      
+      // 使用官方的 insertTag 命令
+      // 这会创建真正的标签引用和 DOM 元素
+      const tagId = await orca.commands.invokeEditorCommand(
+        "core.editor.insertTag",
+        cursor,
+        blockId,
+        "card"  // 标签名称
+      )
+      
+      console.log(`[${pluginName}] ✓ 标签添加成功，tagId: ${tagId}`)
+      console.log(`[${pluginName}] 添加后 block.refs:`, orca.state.blocks[blockId]?.refs)
+    } catch (error) {
+      console.error(`[${pluginName}] ✗ 添加标签失败:`, error)
+      orca.notify("error", `添加标签失败: ${error}`, { title: "SRS" })
+      return null
+    }
+  } else {
+    console.log(`[${pluginName}] 块已有 #card 标签，跳过添加`)
+  }
+
+  // 直接转换为 SRS 卡片
   const { front, back } = resolveFrontBack(block)
 
-  // 直接修改块的 _repr（Valtio 会自动触发响应式更新）
+  console.log(`[${pluginName}] 题目（front）: "${front}"`)
+  console.log(`[${pluginName}] 答案（back）: "${back}"`)
+
+  // 修改块的 _repr（Valtio 会自动触发响应式更新）
   block._repr = {
     type: "srs.card",
     front: front,
@@ -816,19 +844,19 @@ async function makeCardFromBlock(cursor: CursorData) {
 
   await writeInitialSrsState(blockId)
 
-  console.log(`[${pluginName}] 块 #${blockId} 已转换为 SRS 卡片`)
-  console.log(`  题目: ${front}`)
-  console.log(`  答案: ${back}`)
+  console.log(`[${pluginName}] ✓ 块 #${blockId} 已转换为 SRS 卡片`)
+  console.log(`[${pluginName}] 最终 block._repr:`, block._repr)
+  console.log(`[${pluginName}] 最终 block.refs:`, block.refs)
 
   // 显示通知
   orca.notify(
     "success",
-    "已转换为 SRS 记忆卡片",
+    "已添加 #card 标签并转换为 SRS 记忆卡片",
     { title: "SRS" }
   )
 
   // 返回结果供 undo 使用
-  return { blockId, originalRepr }
+  return { blockId, originalRepr, originalText }
 }
 
 // ========================================
