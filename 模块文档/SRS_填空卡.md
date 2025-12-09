@@ -157,11 +157,13 @@ const newBlockText =
    - 保存原始 `content` 数组用于撤销
    - 支持完整的 undo/redo 功能
 
-4. **#card 标签自动添加**
+4. **#card 标签自动添加与类型标记**
 
    - 创建 cloze 标记后，自动检查块是否有 `#card` 标签
    - 检查逻辑：`block.refs?.some(ref => ref.type === 2 && ref.alias === "card")`
-   - 如果没有标签，使用 `core.editor.insertTag` 命令自动添加
+   - 如果没有标签，使用 `core.editor.insertTag` 命令自动添加，并设置 `type` 属性为 `cloze`
+   - 如果标签已存在，使用 `core.editor.setRefData` 命令更新 `type` 属性为 `cloze`
+   - 这样可以将填空卡标记为 "cloze" 类型，便于后续区分普通卡片和填空卡
    - 避免重复添加，确保每个块只有一个 `#card` 标签
 
 5. **错误处理**
@@ -169,7 +171,8 @@ const newBlockText =
    - 检查是否有选中文本
    - 确保选中范围在同一块内
    - 捕获更新命令的异常
-   - 标签添加失败不影响 cloze 创建（容错处理）
+   - 标签添加/属性更新失败不影响 cloze 创建（容错处理）
+   - 所有操作都有详细的日志记录
 
 ---
 
@@ -299,6 +302,7 @@ const newBlockText =
 - ✅ **基础填空标记**：选中文本 → 转换为 `{cN:: 文本}` 格式
 - ✅ **编号自动递增**：智能检测现有编号，避免冲突
 - ✅ **自动添加标签**：首次创建填空时自动添加 `#card` 标签
+- ✅ **卡片类型标记**：自动设置 `#card` 标签的 `type` 属性为 `cloze`，便于区分填空卡和普通卡片
 - ✅ **Inline 渲染器**：编辑器内隐藏 `{cN::}` 符号，显示自定义样式
 - ✅ **ContentFragment 解析**：将纯文本转换为富文本结构
 - ✅ **撤销/重做支持**：完整的 undo/redo 功能

@@ -217,19 +217,43 @@ export async function createCloze(
       ref => ref.type === 2 && ref.alias === "card"
     )
 
-    // 如果没有标签，使用官方命令添加
+    // 如果没有标签，使用官方命令添加，并设置 type 属性为 cloze
     if (!hasCardTagAfter) {
       try {
-        // 使用官方的 insertTag 命令
+        // 使用官方的 insertTag 命令，同时设置 type 属性
         await orca.commands.invokeEditorCommand(
           "core.editor.insertTag",
           cursor,
           blockId,
-          "card"
+          "card",
+          [{ name: "type", value: "cloze" }]  // 设置卡片类型为 cloze
         )
+        console.log(`[${pluginName}] 已添加 #card 标签并设置 type=cloze`)
       } catch (error) {
         console.error(`[${pluginName}] 添加 #card 标签失败:`, error)
         // 标签添加失败不影响 cloze 创建，只记录错误
+      }
+    } else {
+      // 如果标签已存在，需要更新其 type 属性
+      try {
+        const updatedBlock = orca.state.blocks[blockId] as Block
+        const cardRef = updatedBlock.refs?.find(
+          ref => ref.type === 2 && ref.alias === "card"
+        )
+
+        if (cardRef) {
+          // 使用 setRefData 更新标签属性
+          await orca.commands.invokeEditorCommand(
+            "core.editor.setRefData",
+            null,
+            cardRef,
+            [{ name: "type", value: "cloze" }]
+          )
+          console.log(`[${pluginName}] 已更新 #card 标签的 type=cloze`)
+        }
+      } catch (error) {
+        console.error(`[${pluginName}] 更新 #card 标签属性失败:`, error)
+        // 属性更新失败不影响 cloze 创建，只记录错误
       }
     }
 
