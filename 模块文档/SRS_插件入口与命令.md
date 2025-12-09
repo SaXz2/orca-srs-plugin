@@ -4,6 +4,8 @@
 
 本模块是插件的入口点，负责注册命令、工具栏按钮、斜杠命令、块渲染器和转换器。
 
+> [!NOTE] > **2025-12-09 重构**：`main.ts` 从 915 行精简至约 270 行，核心逻辑拆分到 6 个子模块。
+
 ### 核心价值
 
 - 集中管理插件生命周期
@@ -16,7 +18,16 @@
 
 - [main.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/main.ts)（load、unload 函数及命令注册）
 
-### 生命周期
+### 拆分后的子模块
+
+| 模块       | 文件                                                                                 | 职责                  |
+| ---------- | ------------------------------------------------------------------------------------ | --------------------- |
+| 面板工具   | [panelUtils.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/panelUtils.ts)       | 面板查找和调整        |
+| 块工具     | [blockUtils.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/blockUtils.ts)       | 块类型判断、文本提取  |
+| 卡片收集   | [cardCollector.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardCollector.ts) | 收集 SRS 块、构建队列 |
+| Deck 工具  | [deckUtils.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/deckUtils.ts)         | Deck 提取和统计       |
+| 卡片创建   | [cardCreator.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardCreator.ts)     | 卡片转换和扫描        |
+| 浏览器管理 | [cardBrowser.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardBrowser.ts)     | 浏览器弹窗管理        |
 
 ```mermaid
 flowchart TD

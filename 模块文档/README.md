@@ -6,41 +6,51 @@
 
 ### 核心功能模块
 
-1. **[SRS_记忆算法.md](SRS_记忆算法.md)**
+1. **[SRS\_记忆算法.md](SRS_记忆算法.md)**
+
    - FSRS 算法实现和状态管理
    - 关键文件：`src/srs/algorithm.ts`、`src/srs/types.ts`
 
-2. **[SRS_数据存储.md](SRS_数据存储.md)**
+2. **[SRS\_数据存储.md](SRS_数据存储.md)**
+
    - 卡片数据的持久化和读取
    - 关键文件：`src/srs/storage.ts`
 
-3. **[SRS_卡片创建与管理.md](SRS_卡片创建与管理.md)**
+3. **[SRS\_卡片创建与管理.md](SRS_卡片创建与管理.md)**
+
    - 卡片的创建、转换和标签处理
-   - 关键文件：`src/main.ts` 中的相关函数
+   - 关键文件：`src/srs/cardCreator.ts`
+
+4. **[SRS\_工具函数模块.md](SRS_工具函数模块.md)** ⭐ 新增
+   - 2025-12-09 重构后的 6 个工具模块文档
+   - 关键文件：`src/srs/panelUtils.ts`、`blockUtils.ts`、`cardCollector.ts`、`deckUtils.ts`、`cardCreator.ts`、`cardBrowser.ts`
 
 ### 用户界面模块
 
-4. **[SRS_卡片复习窗口.md](SRS_卡片复习窗口.md)**
+5. **[SRS\_卡片复习窗口.md](SRS_卡片复习窗口.md)**
+
    - 复习会话界面和交互
    - 关键文件：`src/components/SrsReviewSession*.tsx`、`SrsCardDemo.tsx`
 
-5. **[SRS_卡片浏览器.md](SRS_卡片浏览器.md)**
+6. **[SRS\_卡片浏览器.md](SRS_卡片浏览器.md)**
+
    - 卡片浏览和管理界面
    - 关键文件：`src/components/SrsCardBrowser.tsx`
 
-6. **[SRS_块渲染器.md](SRS_块渲染器.md)**
+7. **[SRS\_块渲染器.md](SRS_块渲染器.md)**
    - 编辑器内卡片的显示和交互
    - 关键文件：`src/components/SrsCardBlockRenderer.tsx`
 
 ### 基础设施模块
 
-7. **[SRS_插件入口与命令.md](SRS_插件入口与命令.md)**
-   - 插件初始化和命令注册
-   - 关键文件：`src/main.ts` 的插件加载部分
+8. **[SRS\_插件入口与命令.md](SRS_插件入口与命令.md)**
 
-8. **[SRS_复习队列管理.md](SRS_复习队列管理.md)**
+   - 插件初始化和命令注册
+   - 关键文件：`src/main.ts`（2025-12-09 已精简，核心逻辑拆分到子模块）
+
+9. **[SRS\_复习队列管理.md](SRS_复习队列管理.md)**
    - 复习队列的构建和管理
-   - 关键文件：`src/main.ts` 中的队列管理函数、`src/srs/reviewSessionManager.ts`
+   - 关键文件：`src/srs/cardCollector.ts`、`src/srs/reviewSessionManager.ts`
 
 ## 文档结构说明
 
