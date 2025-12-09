@@ -48,6 +48,7 @@ flowchart TD
 - `reviewedCount`：已复习数量
 - `isGrading`：正在评分标志
 - `lastLog`：最近评分日志
+- `isMaximized`：是否最大化显示
 
 #### 会话流程
 
@@ -112,6 +113,7 @@ stateDiagram-v2
 - 在主编辑区右侧显示
 - 可跳转到卡片原始位置
 - 支持编辑卡片内容
+- **支持最大化显示**：点击工具栏最大化按钮，通过设置父级 `.orca-block-editor[maximize="1"]` 属性隐藏 query tabs 并铺满面板
 
 ## 扩展点
 

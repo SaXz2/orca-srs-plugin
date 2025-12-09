@@ -7,7 +7,7 @@ import { updateSrsState } from "../srs/storage"
 import SrsCardDemo from "./SrsCardDemo"
 
 // 从全局 window 对象获取 React（Orca 插件约定）
-const { useMemo, useState } = window.React
+const { useEffect, useMemo, useRef, useState } = window.React
 const { Button, ModalOverlay } = orca.components
 
 type SrsReviewSessionProps = {
@@ -25,11 +25,65 @@ export default function SrsReviewSession({
   inSidePanel = false,
   panelId
 }: SrsReviewSessionProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const [queue, setQueue] = useState<ReviewCard[]>(cards)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [reviewedCount, setReviewedCount] = useState(0)
   const [isGrading, setIsGrading] = useState(false)
   const [lastLog, setLastLog] = useState<string | null>(null)
+  const [isMaximized, setIsMaximized] = useState(false)
+
+  // 当最大化状态变化时，设置父级 .orca-block-editor 的 maximize 属性并隐藏 query tabs
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    // 查找父级 .orca-block-editor 元素
+    const blockEditor = container.closest('.orca-block-editor') as HTMLElement | null
+    if (!blockEditor) return
+
+    // 查找需要隐藏的元素（编辑器级别）
+    const noneEditableEl = blockEditor.querySelector('.orca-block-editor-none-editable') as HTMLElement | null
+    const goBtns = blockEditor.querySelector('.orca-block-editor-go-btns') as HTMLElement | null
+    const sidetools = blockEditor.querySelector('.orca-block-editor-sidetools') as HTMLElement | null
+    const panelDragHandle = blockEditor.parentElement?.querySelector('.orca-panel-drag-handle') as HTMLElement | null
+
+    // 查找 repr 级别需要隐藏的元素（块手柄、折叠按钮等）
+    const reprNoneEditable = blockEditor.querySelector('.orca-repr-main-none-editable') as HTMLElement | null
+    const breadcrumb = blockEditor.querySelector('.orca-breadcrumb') as HTMLElement | null
+
+    if (isMaximized) {
+      blockEditor.setAttribute('maximize', '1')
+      // 隐藏 query tabs 区域和其他工具栏
+      if (noneEditableEl) noneEditableEl.style.display = 'none'
+      if (goBtns) goBtns.style.display = 'none'
+      if (sidetools) sidetools.style.display = 'none'
+      if (panelDragHandle) panelDragHandle.style.display = 'none'
+      // 隐藏块手柄和折叠按钮（在 repr 层级）
+      if (reprNoneEditable) reprNoneEditable.style.display = 'none'
+      if (breadcrumb) breadcrumb.style.display = 'none'
+    } else {
+      blockEditor.removeAttribute('maximize')
+      // 恢复显示
+      if (noneEditableEl) noneEditableEl.style.display = ''
+      if (goBtns) goBtns.style.display = ''
+      if (sidetools) sidetools.style.display = ''
+      if (panelDragHandle) panelDragHandle.style.display = ''
+      if (reprNoneEditable) reprNoneEditable.style.display = ''
+      if (breadcrumb) breadcrumb.style.display = ''
+    }
+
+    // 清理函数：组件卸载时恢复原状
+    return () => {
+      blockEditor.removeAttribute('maximize')
+      if (noneEditableEl) noneEditableEl.style.display = ''
+      if (goBtns) goBtns.style.display = ''
+      if (sidetools) sidetools.style.display = ''
+      if (panelDragHandle) panelDragHandle.style.display = ''
+      if (reprNoneEditable) reprNoneEditable.style.display = ''
+      if (breadcrumb) breadcrumb.style.display = ''
+    }
+  }, [isMaximized])
 
   const totalCards = queue.length
   const currentCard = queue[currentIndex]
@@ -222,12 +276,16 @@ export default function SrsReviewSession({
   // ========================================
   if (inSidePanel) {
     return (
-      <div className="srs-review-session-panel" style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        backgroundColor: "var(--orca-color-bg-0)"
-      }}>
+      <div
+        ref={containerRef}
+        className={`srs-review-session-panel ${isMaximized ? 'orca-maximized' : ''}`}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          backgroundColor: "var(--orca-color-bg-0)"
+        }}
+      >
         <div style={{
           height: "4px",
           backgroundColor: "var(--orca-color-bg-2)"
@@ -243,25 +301,38 @@ export default function SrsReviewSession({
         <div style={{
           padding: "12px 16px",
           borderBottom: "1px solid var(--orca-color-border-1)",
-          backgroundColor: "var(--orca-color-bg-1)"
+          backgroundColor: "var(--orca-color-bg-1)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between"
         }}>
-          <div style={{
-            fontSize: "14px",
-            color: "var(--orca-color-text-2)",
-            fontWeight: 500
-          }}>
-            卡片 {currentIndex + 1} / {totalCards}（到期 {counters.due} | 新卡 {counters.fresh}）
-          </div>
-          {lastLog && (
+          <div>
             <div style={{
-              marginTop: "6px",
-              fontSize: "12px",
+              fontSize: "14px",
               color: "var(--orca-color-text-2)",
-              opacity: 0.8
+              fontWeight: 500
             }}>
-              {lastLog}
+              卡片 {currentIndex + 1} / {totalCards}（到期 {counters.due} | 新卡 {counters.fresh}）
             </div>
-          )}
+            {lastLog && (
+              <div style={{
+                marginTop: "6px",
+                fontSize: "12px",
+                color: "var(--orca-color-text-2)",
+                opacity: 0.8
+              }}>
+                {lastLog}
+              </div>
+            )}
+          </div>
+          <Button
+            variant="plain"
+            onClick={() => setIsMaximized(!isMaximized)}
+            title={isMaximized ? "还原" : "最大化"}
+            style={{ marginLeft: "8px" }}
+          >
+            <i className={`ti ${isMaximized ? 'ti-maximize-off' : 'ti-maximize'}`} />
+          </Button>
         </div>
 
         <div style={{ flex: 1, overflow: "auto", padding: "8px" }}>
