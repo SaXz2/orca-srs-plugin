@@ -11,7 +11,8 @@ import { setupL10N, t } from "./libs/l10n"
 import zhCN from "./translations/zhCN"
 import SrsReviewSessionRenderer from "./components/SrsReviewSessionRenderer"
 import SrsCardBlockRenderer from "./components/SrsCardBlockRenderer"
-import type { BlockForConversion, Repr, CursorData } from "./orca.d.ts"
+import ClozeInlineRenderer from "./components/ClozeInlineRenderer"
+import type { BlockForConversion, Repr, CursorData, Block } from "./orca.d.ts"
 import { getOrCreateReviewSessionBlock, cleanupReviewSessionBlock } from "./srs/reviewSessionManager"
 
 // 导入拆分后的模块
@@ -21,6 +22,7 @@ import { collectReviewCards, buildReviewQueue } from "./srs/cardCollector"
 import { extractDeckName, calculateDeckStats } from "./srs/deckUtils"
 import { scanCardsFromTags, makeCardFromBlock } from "./srs/cardCreator"
 import { openCardBrowser, closeCardBrowser } from "./srs/cardBrowser"
+import { createCloze } from "./srs/clozeUtils"
 
 // 插件全局状态
 let pluginName: string
@@ -110,6 +112,62 @@ export async function load(_name: string) {
     }
   )
 
+  // 命令：将选中文本转换为 Cloze 填空
+  orca.commands.registerEditorCommand(
+    `${pluginName}.createCloze`,
+    // do 函数：执行 cloze 转换
+    async (editor, ...args) => {
+      const [panelId, rootBlockId, cursor, isRedo] = editor
+      if (!cursor) {
+        orca.notify("error", "无法获取光标位置")
+        return null
+      }
+      const result = await createCloze(cursor, pluginName)
+      return result ? { ret: result, undoArgs: result } : null
+    },
+    // undo 函数：撤销 cloze 转换
+    async (undoArgs: any) => {
+      if (!undoArgs || !undoArgs.blockId) return
+
+      const block = orca.state.blocks[undoArgs.blockId] as Block
+      if (!block) return
+
+      // 恢复原始内容
+      if (undoArgs.originalContent) {
+        // 如果有原始 content 数组，使用编辑器命令恢复
+        await orca.commands.invokeEditorCommand(
+          "core.editor.setBlocksContent",
+          null,
+          [
+            {
+              id: undoArgs.blockId,
+              content: undoArgs.originalContent
+            }
+          ],
+          false
+        )
+      } else if (undoArgs.originalText !== undefined) {
+        // 如果只有原始 text，更新为文本片段
+        await orca.commands.invokeEditorCommand(
+          "core.editor.setBlocksContent",
+          null,
+          [
+            {
+              id: undoArgs.blockId,
+              content: [{ t: "t", v: undoArgs.originalText }]
+            }
+          ],
+          false
+        )
+      }
+    },
+    {
+      label: "SRS: 创建 Cloze 填空",
+      hasArgs: false
+    }
+  )
+
+
   // ========================================
   // 3. 注册工具栏按钮
   // ========================================
@@ -124,6 +182,13 @@ export async function load(_name: string) {
     tooltip: "打开卡片浏览器",
     command: `${pluginName}.openCardBrowser`
   })
+
+  orca.toolbar.registerToolbarButton(`${pluginName}.clozeButton`, {
+    icon: "ti ti-braces",
+    tooltip: "创建 Cloze 填空",
+    command: `${pluginName}.createCloze`
+  })
+
 
   // ========================================
   // 4. 注册斜杠命令
@@ -155,6 +220,15 @@ export async function load(_name: string) {
   )
 
   // ========================================
+  // 5.5. 注册自定义 inline 渲染器
+  // ========================================
+  orca.renderers.registerInline(
+    `${pluginName}.cloze`,
+    false,
+    ClozeInlineRenderer
+  )
+
+  // ========================================
   // 6. 注册 plain 转换器
   // ========================================
   orca.converters.registerBlock(
@@ -171,6 +245,18 @@ export async function load(_name: string) {
     "plain",
     "srs.review-session",
     () => "[SRS 复习会话面板块]"
+  )
+
+  // 注册 cloze inline 转换器
+  orca.converters.registerInline(
+    "plain",
+    `${pluginName}.cloze`,
+    (fragment: any) => {
+      // 将 cloze inline 转换为 {cN:: 内容} 格式的纯文本
+      const clozeNumber = fragment.clozeNumber || 1
+      const content = fragment.v || ""
+      return `{c${clozeNumber}:: ${content}}`
+    }
   )
 
   console.log(`[${pluginName}] 命令、UI 组件和渲染器已注册`)
@@ -193,10 +279,12 @@ export async function unload() {
   orca.commands.unregisterCommand(`${pluginName}.scanCardsFromTags`)
   orca.commands.unregisterCommand(`${pluginName}.openCardBrowser`)
   orca.commands.unregisterEditorCommand(`${pluginName}.makeCardFromBlock`)
+  orca.commands.unregisterEditorCommand(`${pluginName}.createCloze`)
 
   // 移除工具栏按钮
   orca.toolbar.unregisterToolbarButton(`${pluginName}.reviewButton`)
   orca.toolbar.unregisterToolbarButton(`${pluginName}.browserButton`)
+  orca.toolbar.unregisterToolbarButton(`${pluginName}.clozeButton`)
 
   // 移除斜杠命令
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.makeCard`)
