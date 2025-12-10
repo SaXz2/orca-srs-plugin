@@ -72,7 +72,7 @@ stateDiagram-v2
 - 显示题目区域（支持嵌入 Orca Block）
 - 答案揭示交互
 - 四个评分按钮
-- SRS 状态信息显示
+- ~~SRS 状态信息显示~~（已隐藏，2025-12-10）
 
 #### 题目区域
 
@@ -114,6 +114,37 @@ stateDiagram-v2
 - 可跳转到卡片原始位置
 - 支持编辑卡片内容
 - **支持最大化显示**：点击工具栏最大化按钮，通过设置父级 `.orca-block-editor[maximize="1"]` 属性隐藏 query tabs 并铺满面板
+
+### UI 显示优化（2025-12-10 更新）
+
+#### 日期格式简化
+
+- **旧格式**：`2025/12/10 13:26:11` 或 `2025-12-10T16:00:00.000Z`
+- **新格式**：`12-10`（只显示月-日）
+- **实现**：添加 `formatSimpleDate()` 函数
+  ```typescript
+  function formatSimpleDate(date: Date): string {
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+    return `${month}-${day}`
+  }
+  ```
+- **使用场景**：
+  - 评分后的提示信息：`评分 GOOD [c1] -> 下次 12-15，间隔 5 天`
+  - 复习面板顶部的日志显示
+
+#### 隐藏 SRS 详细信息
+
+已隐藏以下技术细节（不在复习界面显示）：
+
+- ❌ 下次复习的完整时间戳
+- ❌ 间隔天数 / 稳定度 / 难度
+- ❌ 已复习次数 / 遗忘次数
+
+**影响的组件**：
+- `SrsCardDemo.tsx` - Basic 卡片复习界面
+- `ClozeCardReviewRenderer.tsx` - Cloze 卡片复习界面
+- `SrsCardBlockRenderer.tsx` - 编辑器内卡片块显示
 
 ## 扩展点
 

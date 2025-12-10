@@ -57,13 +57,13 @@ type BlockWithRepr = Block & { _repr?: Repr };
 
 ### 导出函数
 
-| 函数                              | 说明              |
-| --------------------------------- | ----------------- |
-| `collectSrsBlocks(pluginName?)`   | 收集所有 SRS 块   |
-| `collectReviewCards(pluginName?)` | 收集待复习卡片    |
-| `buildReviewQueue(cards)`         | 构建 2:1 交错队列 |
+| 函数                              | 说明                                   |
+| --------------------------------- | -------------------------------------- |
+| `collectSrsBlocks(pluginName?)`   | 收集所有 SRS 块                        |
+| `collectReviewCards(pluginName?)` | 收集待复习卡片（支持 Cloze 多填空）    |
+| `buildReviewQueue(cards)`         | 构建 2:1 交错队列（支持新卡到期检查） |
 
-### 收集逻辑
+### 收集逻辑（2025-12-10 更新）
 
 ```mermaid
 flowchart TD
@@ -72,8 +72,26 @@ flowchart TD
     B -->|否| D[备用：get-all-blocks]
     D --> E[手动过滤 card 标签]
     E --> C
-    C --> F[去重返回]
+    C --> F{识别卡片类型}
+    F -->|Basic| G[生成 1 张 ReviewCard]
+    F -->|Cloze| H[为每个填空生成独立 ReviewCard]
+    G --> I[返回所有卡片]
+    H --> I
 ```
+
+**关键更新**：
+
+- `collectReviewCards()` 必须接收正确的 `pluginName` 参数
+- 用于识别 Cloze inline fragment 类型（`${pluginName}.cloze`）
+- 如果不传或传错，Cloze 卡片会被跳过（找不到填空）
+- 通过 `block.properties` 检查 `srs.isCard` 属性来识别持久化的卡片
+
+**Cloze 卡片处理**：
+
+- 从 `block.content` 提取所有 `clozeNumber`
+- 为每个填空生成独立的 `ReviewCard` 对象
+- 每个 ReviewCard 包含 `clozeNumber` 属性用于标识
+- 使用 `loadClozeSrsState(blockId, clozeNumber)` 加载独立的 SRS 状态
 
 ---
 
@@ -93,6 +111,23 @@ flowchart TD
 1. 查找 `block.refs` 中 `type=2, alias="card"` 的引用
 2. 从 `ref.data` 找 `name="deck"` 的属性
 3. 返回 `value`（支持数组或字符串），默认 `"Default"`
+
+### extractCardType 逻辑（2025-12-10 新增）
+
+从标签属性中提取卡片类型：
+
+1. 查找 `block.refs` 中 `type=2, alias="card"` 的引用
+2. 从 `ref.data` 找 `name="type"` 的属性
+3. 返回值：
+   - `"cloze"` - 填空卡片
+   - `"basic"` - 普通卡片（默认）
+4. 支持数组和字符串格式，自动转换为小写
+
+**用途**：
+
+- 在 `collectReviewCards()` 中识别卡片类型
+- 决定使用哪种渲染器（`SrsCardDemo` vs `ClozeCardReviewRenderer`）
+- 决定是否需要为每个填空生成独立的 ReviewCard
 
 ---
 

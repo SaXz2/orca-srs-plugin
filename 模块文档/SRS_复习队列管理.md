@@ -52,15 +52,36 @@ flowchart TD
 
 #### `buildReviewQueue(cards): ReviewCard[]`
 
-构建复习队列，采用两旧一新策略：
+构建复习队列，采用两旧一新策略。
+
+**关键特性（2025-12-10 更新）：**
+
+- **新卡到期检查**：新卡也需要检查到期时间，只有到期日期 <= 今天的新卡才会出现在队列中
+- **日期比较方式**：只比较日期（零点），忽略具体时分秒
+- **支持分天推送**：实现 Cloze 卡片的 c1 今天、c2 明天、c3 后天的分天推送机制
+
+```typescript
+// 到期卡片：已复习过 && 到期日期 < 明天零点
+const dueCards = cards.filter(card => {
+  if (card.isNew) return false
+  return card.srs.due.getTime() < todayEnd.getTime()
+})
+
+// 新卡片：未复习过 && 到期日期 < 明天零点（关键修改）
+const newCards = cards.filter(card => {
+  if (!card.isNew) return false
+  return card.srs.due.getTime() < todayEnd.getTime()
+})
+```
 
 ```mermaid
 flowchart LR
     A[到期卡片] --> B[队列]
-    C[新卡片] --> B
+    C[今日新卡] --> B
+    D[未来新卡] -.被过滤.-> E[不进入队列]
 
     subgraph 交织策略
-        D[旧1] --> E[旧2] --> F[新1] --> G[旧3] --> H[旧4] --> I[新2]
+        F[旧1] --> G[旧2] --> H[新1] --> I[旧3] --> J[旧4] --> K[新2]
     end
 ```
 
@@ -108,11 +129,16 @@ flowchart LR
 [A, B, 1, C, D, 2, E, 3]
 ```
 
-#### 到期判定
+#### 到期判定（2025-12-10 更新）
 
-- 新卡：`lastReviewed === null` 或 `reps === 0`
-- 到期：`due <= 当前时间`
-- 未到期：不进入本次队列
+- **新卡定义**：`lastReviewed === null` 或 `reps === 0`
+- **到期判断（类似 ANKI）**：
+  - 只比较日期，忽略时分秒
+  - 计算今天范围：`[今天零点, 明天零点)`
+  - 到期条件：`card.srs.due < 明天零点`
+  - 即使卡片到期时间是今天 14:10，在今天 14:00 也能看到
+- **新卡也要检查到期**：只有到期日期 <= 今天的新卡才会出现在队列中
+- **未来卡片**：到期日期 > 今天的卡片不进入本次队列
 
 ### 面板管理
 

@@ -166,7 +166,38 @@ const newBlockText =
    - 这样可以将填空卡标记为 "cloze" 类型，便于后续区分普通卡片和填空卡
    - 避免重复添加，确保每个块只有一个 `#card` 标签
 
-5. **错误处理**
+5. **持久化标记（2025-12-10 新增）**
+
+   - 设置 `srs.isCard` 属性（持久化到数据库）：
+     ```typescript
+     await orca.commands.invokeEditorCommand(
+       "core.editor.setProperties",
+       null,
+       [blockId],
+       [{ name: "srs.isCard", value: true, type: 4 }]
+     )
+     ```
+   - **为什么需要**：`_repr` 属性不会持久化，重启 Orca 后会丢失
+   - **解决方案**：使用块属性 `srs.isCard` 作为持久化标记
+   - `collectReviewCards()` 通过 `block.properties` 检查此属性来识别填空卡
+
+6. **分天推送机制（2025-12-10 新增）**
+
+   - 多个填空自动设置不同的到期日期：
+     - c1 → 今天到期（offset = 0 天）
+     - c2 → 明天到期（offset = 1 天）
+     - c3 → 后天到期（offset = 2 天）
+   - 实现代码：
+     ```typescript
+     for (let i = 0; i < clozeNumbers.length; i++) {
+       const clozeNumber = clozeNumbers[i]
+       const daysOffset = clozeNumber - 1 // c1=0天, c2=1天, c3=2天...
+       await writeInitialClozeSrsState(blockId, clozeNumber, daysOffset)
+     }
+     ```
+   - **效果**：避免同一块的多个填空在同一天全部出现，分散学习负担
+
+7. **错误处理**
    - 验证光标位置有效性
    - 检查是否有选中文本
    - 确保选中范围在同一块内
