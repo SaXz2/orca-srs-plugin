@@ -29,28 +29,69 @@ type ReviewBlockProps = {
 
 function ReviewBlock({ blockId, panelId, fallback, hideChildren = false }: ReviewBlockProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  // 使用 ref 存储防抖定时器 ID，避免闭包问题
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!hideChildren) return
     const container = containerRef.current
     if (!container) return
 
+    /**
+     * 隐藏子块元素
+     * 查找并隐藏所有包含 'children' 的类名/角色的元素
+     */
     const hideDescendants = () => {
-      const childNodes = container.querySelectorAll<HTMLElement>("[class*='children'], [data-role*='children'], [data-testid*='children']")
+      const childNodes = container.querySelectorAll<HTMLElement>(
+        "[class*='children'], [data-role*='children'], [data-testid*='children']"
+      )
       childNodes.forEach((node: HTMLElement) => {
         node.style.display = "none"
       })
     }
 
+    /**
+     * 带防抖的隐藏子块函数
+     * 防止 MutationObserver 频繁触发导致性能问题
+     * @param delay 防抖延迟时间（毫秒）
+     */
+    const debouncedHideDescendants = (delay: number = 100) => {
+      // 清除之前的定时器
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current)
+      }
+      // 设置新的定时器
+      debounceTimerRef.current = setTimeout(() => {
+        hideDescendants()
+        debounceTimerRef.current = null
+      }, delay)
+    }
+
+    // 初始执行一次（无延迟）
     hideDescendants()
 
+    // 创建 MutationObserver，使用防抖回调
     const observer = new MutationObserver(() => {
-      hideDescendants()
+      debouncedHideDescendants(100)
     })
 
-    observer.observe(container, { childList: true, subtree: true })
+    // 只监听直接子节点变化，减少不必要的触发
+    // subtree: true 仍然需要，因为 Block 组件可能在深层嵌套中渲染 children
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+      attributes: false,      // 不监听属性变化
+      characterData: false    // 不监听文本变化
+    })
 
-    return () => observer.disconnect()
+    // 清理函数：断开 observer 并取消待执行的防抖调用
+    return () => {
+      observer.disconnect()
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
+    }
   }, [hideChildren, blockId])
 
   const containerClassName = `srs-block-container${hideChildren ? " srs-block-hide-children" : ""}`
