@@ -1,153 +1,158 @@
-# SRS 卡片浏览器模块
+# SRS 卡片浏览器（Flashcard Home）
 
 ## 概述
 
-本模块提供卡片管理界面，支持按 Deck 浏览、筛选卡片和快速开始复习。
+Flashcard Home 是新版卡片浏览器，嵌入在 Orca 面板系统中，以块的形式呈现。它替换了早期的模态弹窗（`SrsCardBrowser.tsx`），提供更完整的仪表板体验，让 Deck 管理、卡片统计与卡片列表聚合在同一面板。
+
+> [!NOTE]
+> 2025‑12‑10 起，所有“打开卡片浏览器”的入口都会转向 Flashcard Home 块（`srs.flashcard-home`）。
 
 ### 核心价值
 
-- 两级导航：Deck 列表 → 卡片列表
-- 支持按到期状态筛选
-- 点击卡片跳转到原始块
+- **与面板系统一致**：支持分屏、面板历史、快捷键，不卡住编辑器。
+- **数据聚合**：一屏展示统计、快速复习、Deck 卡片与卡片列表。
+- **按 Deck 复习**：直接在列表中触发指定 Deck 的复习队列。
+- **统一的卡片列表**：沿用旧浏览器的筛选逻辑（全部/已到期/今天/未来/新卡）。
+- **可刷新**：随时重新计算统计与卡片状态。
 
-## 技术实现
+---
 
-### 核心文件
+## 代码组成
 
-- [SrsCardBrowser.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/components/SrsCardBrowser.tsx)
+| 文件 | 职责 |
+| ---- | ---- |
+| `src/components/SrsFlashcardHome.tsx` | 主界面组件，包含 DeckListView 与 CardListView |
+| `src/components/DeckCardCompact.tsx` | Deck 紧凑卡片组件 |
+| `src/components/SrsFlashcardHomeRenderer.tsx` | Block 渲染器包装，供 Orca 渲染块 |
+| `src/srs/flashcardHomeManager.ts` | 特殊块创建、复用、清理 |
+| `src/srs/registry/renderers.ts` | 注册 `srs.flashcard-home` 渲染器 |
+| `src/srs/registry/uiComponents.ts` | 工具栏“Flashcard Home”按钮 |
+| `src/srs/registry/commands.ts` | `openFlashcardHome` 命令 |
+| `src/main.ts` | 面板打开逻辑、Block 管理、复习过滤 |
 
-### 组件结构
+---
+
+## 渲染架构
 
 ```mermaid
 flowchart TD
-    A[SrsCardBrowser] --> B{当前视图}
-    B -->|deck-list| C[DeckListView]
-    B -->|card-list| D[CardListView]
-    C --> E[DeckCard x N]
-    D --> F[筛选标签栏]
-    D --> G[卡片列表]
+    A[main.ts: openFlashcardHome] --> B[getOrCreateFlashcardHomeBlock]
+    B -->|返回 blockId| C[Orca 面板]
+    C --> D[srs.flashcard-home 渲染器]
+    D --> E[SrsFlashcardHome 组件]
+    E -->|视图切换| F{viewMode}
+    F -->|deck-list| G[DeckListView]
+    F -->|card-list| H[CardListView]
 ```
 
-### DeckListView 组件
+- **Block 类型**：`srs.flashcard-home`
+- **存储键**：`flashcardHomeBlockId`（保存在插件数据里，避免重复创建）
+- **转换器**：plain 格式输出 `[SRS Flashcard Home 面板块]`
 
-显示所有 Deck 的统计信息：
+---
 
-| 统计项 | 说明              |
-| ------ | ----------------- |
-| 新卡数 | 从未复习的卡片    |
-| 到期数 | 已到期 + 今天到期 |
-| 总计   | 该 Deck 所有卡片  |
+## DeckListView
 
-#### 功能
+DeckListView 是默认视图，聚合仪表板、快速复习入口、Deck 列表三块内容。
 
-- 点击 Deck 进入卡片列表
-- 底部"开始复习所有 Deck"按钮
-- 实时加载统计数据
+### 1. 顶部信息
 
-### CardListView 组件
+- 标题 + 当前插件名
+- “刷新”按钮（有节流，刷新中禁用）
+- 错误提醒（加载失败时展示）
 
-显示单个 Deck 内的卡片列表：
+### 2. 统计仪表板
 
-#### 筛选类型
+| 指标 | 数据来源 | 说明 |
+| ---- | -------- | ---- |
+| 今日待复习 | `TodayStats.todayCount` | 今天到期的复习卡片 |
+| 新卡待学 | `TodayStats.newCount` | 从未复习过的卡片 |
+| 总卡片数 | `DeckStats.totalCards` | 所有 Deck 的卡片总数 |
 
-| 类型   | 说明         | 颜色   |
-| ------ | ------------ | ------ |
-| 全部   | 所有卡片     | 默认   |
-| 已到期 | 超过到期时间 | 危险红 |
-| 今天   | 今日内到期   | 警告黄 |
-| 未来   | 明天及以后   | 灰色   |
-| 新卡   | 从未复习     | 主色   |
+`TodayStats` 由 `calculateHomeStats()` 基于 `ReviewCard[]` 计算，包含 `pendingCount`（<= 今天全部卡片）。
 
-#### 卡片信息
+### 3. 快速复习区
 
-- 题目预览
-- 上次复习时间
-- 下次复习时间（颜色编码）
-- 复习次数
+- “开始今日复习”：调用 `startReviewSession()`（无参，复习队列自动包括到期卡片）。
+- “复习所有到期”：使用相同入口，但文案强调范围。
+- 两个按钮在没有待复习卡片时通过 `opacity + pointerEvents` 禁用。
 
-### 交互功能
+### 4. Deck 管理
 
-#### 导航
+每个 Deck 使用 `DeckCardCompact` 渲染：
 
-- 面包屑返回按钮
-- Deck 之间切换
+- 统计：`新卡 / 今天到期 / 已到期 / 总数`
+- 操作：`查看`（切换视图到 CardListView）、`复习`（`startReviewSession(deckName)`）
+- 支持自动布局（`grid` + `minmax(280px, 1fr)`）
 
-#### 操作
+---
 
-- 点击卡片跳转到块
-- 按 Deck 开始复习
-- 复习所有 Deck
+## CardListView
 
-### 数据流
+CardListView 在选择 Deck 后显示，沿用了旧浏览器的列表体验。
 
-```mermaid
-sequenceDiagram
-    participant B as 浏览器
-    participant M as main.ts
-    participant O as Orca Backend
+### 功能模块
 
-    B->>M: collectReviewCards()
-    M->>O: get-blocks-with-tags
-    O-->>M: 带 #card 标签的块
-    M->>M: 构建 ReviewCard 列表
-    M-->>B: ReviewCard[]
-    B->>M: calculateDeckStats()
-    M-->>B: DeckStats
-```
+1. **面包屑**：返回按钮、Deck 名称、刷新按钮、`复习此 Deck`。
+2. **Deck 概览**：展示该 Deck 的新卡/今天/已到期/总数。
+3. **筛选标签**：`全部/已到期/今天/未来/新卡`，每个标签显示数量。
+4. **卡片列表**：按到期时间排序，支持点击跳转块。
+5. **空状态**：无卡片或加载时给出提示。
 
-## 界面设计
+### 筛选逻辑
 
-### Deck 列表视图
+- `overdue`: `card.srs.due < todayStart`
+- `today`: `within today range`
+- `future`: `> todayEnd`
+- `new`: `card.isNew === true`
+- 过滤使用 `useMemo`，避免重复计算。
 
-```
-┌─────────────────────────────────┐
-│ 🃏 SRS 卡片浏览器               │
-├─────────────────────────────────┤
-│ ┌─────────────────────────────┐ │
-│ │ 📚 Default                  │ │
-│ │ 5 新卡 | 3 到期 | 总计 15   │ │
-│ └─────────────────────────────┘ │
-│ ┌─────────────────────────────┐ │
-│ │ 📚 English                  │ │
-│ │ 10 新卡 | 2 到期 | 总计 25  │ │
-│ └─────────────────────────────┘ │
-├─────────────────────────────────┤
-│ 总计: 15 新卡 | 5 到期 | 40 张  │
-│ [ 开始复习所有 Deck ]           │
-└─────────────────────────────────┘
-```
+### 卡片行内容
 
-### 卡片列表视图
+- Front 预览 + Cloze 编号（如 `#c2`）
+- 上次复习时间、到期时间（状态颜色）、复习次数
+- 点击后调用 `orca.nav.goTo("block", { blockId: card.id })`
 
-```
-┌─────────────────────────────────┐
-│ ← 返回  📚 English  [开始复习]  │
-├─────────────────────────────────┤
-│ 全部(25) 已到期(2) 今天(3) ...  │
-├─────────────────────────────────┤
-│ ┌─────────────────────────────┐ │
-│ │ What is "hello"?            │ │
-│ │ 上次: 2024-01-01 下次: 今天 │ │
-│ └─────────────────────────────┘ │
-│ ┌─────────────────────────────┐ │
-│ │ What is "world"?            │ │
-│ │ 上次: 从未  下次: -         │ │
-│ └─────────────────────────────┘ │
-├─────────────────────────────────┤
-│ 当前筛选: 5 / 总计: 25          │
-└─────────────────────────────────┘
-```
+---
+
+## 数据流
+
+1. `loadData()` 使用 `collectReviewCards(pluginName)` 获取所有卡片。
+2. `calculateDeckStats()` 生成各 Deck 统计以及总数。
+3. `calculateHomeStats()` 生成仪表板数据。
+4. React state 保存：`deckStats`、`todayStats`、`cards`、`viewMode`、`selectedDeck`、加载状态。
+5. 复习入口调用 `startReviewSession(deckName?)`，`main.ts` 会记录 `reviewDeckFilter`，并在 `SrsReviewSessionRenderer` 里过滤队列。
+
+---
+
+## 面板管理
+
+- `openFlashcardHome()`：确保右侧面板存在，如果没有则在当前活动面板右侧新建。
+- `flashcardHomeManager`：负责创建/复用块，保存到插件数据，卸载时清理。
+- 渲染器 `SrsFlashcardHomeRenderer` 将 React 组件包裹在 `BlockShell` 中，禁用编辑。
+
+---
 
 ## 扩展点
 
-1. **搜索功能**：可扩展题目搜索
-2. **批量操作**：可扩展批量删除/重置
-3. **排序选项**：可扩展按到期时间/创建时间排序
+1. **新增统计卡片**：在 `StatsSection` 中添加条目，数据可来自 `ReviewCard[]` 的更多指标。
+2. **快速行动**：为 Deck 卡片扩展更多操作（如重置、导出）。
+3. **卡片列表操作**：支持批量选择、快速跳转等。
+4. **视图持久化**：可将 `selectedDeck`、`currentFilter` 写入 block 状态，面板关闭后恢复。
+5. **趋势与图表**：在 DeckListView 上增加图表区，复用 `cards` 数据。
+
+---
 
 ## 相关文件
 
-| 文件                                                                                            | 说明                    |
-| ----------------------------------------------------------------------------------------------- | ----------------------- |
-| [SrsCardBrowser.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/components/SrsCardBrowser.tsx) | 浏览器主组件            |
-| [main.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/main.ts)                                  | 数据收集函数            |
-| [types.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/types.ts)                            | DeckInfo/DeckStats 定义 |
+| 文件 | 说明 |
+| ---- | ---- |
+| `src/components/SrsFlashcardHome.tsx` | 主界面逻辑 |
+| `src/components/DeckCardCompact.tsx` | Deck 卡片组件 |
+| `src/components/SrsFlashcardHomeRenderer.tsx` | Block 渲染器 |
+| `src/srs/flashcardHomeManager.ts` | 特殊块管理 |
+| `src/main.ts` | openFlashcardHome、reviewDeckFilter、复习入口 |
+| `src/srs/registry/commands.ts` | `openFlashcardHome` 命令注册 |
+| `src/srs/registry/uiComponents.ts` | 工具栏按钮 |
+| `src/srs/registry/renderers.ts` | `srs.flashcard-home` 注册 |
+| `src/srs/registry/converters.ts` | plain 转换器 |

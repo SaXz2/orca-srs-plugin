@@ -13,8 +13,8 @@ export function registerUIComponents(pluginName: string): void {
 
   orca.toolbar.registerToolbarButton(`${pluginName}.browserButton`, {
     icon: "ti ti-list",
-    tooltip: "打开卡片浏览器",
-    command: `${pluginName}.openCardBrowser`
+    tooltip: "打开 Flashcard Home",
+    command: `${pluginName}.openFlashcardHome`
   })
 
   orca.toolbar.registerToolbarButton(`${pluginName}.clozeButton`, {

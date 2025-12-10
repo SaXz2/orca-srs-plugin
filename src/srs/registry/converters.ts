@@ -37,6 +37,12 @@ export function registerConverters(pluginName: string): void {
     () => "[SRS 复习会话面板块]"
   )
 
+  orca.converters.registerBlock(
+    "plain",
+    "srs.flashcard-home",
+    () => "[SRS Flashcard Home 面板块]"
+  )
+
   orca.converters.registerInline(
     "plain",
     `${pluginName}.cloze`,
@@ -52,5 +58,6 @@ export function unregisterConverters(pluginName: string): void {
   orca.converters.unregisterBlock("plain", "srs.card")
   orca.converters.unregisterBlock("plain", "srs.cloze-card")
   orca.converters.unregisterBlock("plain", "srs.review-session")
+  orca.converters.unregisterBlock("plain", "srs.flashcard-home")
   orca.converters.unregisterInline("plain", `${pluginName}.cloze`)
 }

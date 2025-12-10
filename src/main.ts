@@ -13,7 +13,7 @@ import { getOrCreateReviewSessionBlock, cleanupReviewSessionBlock } from "./srs/
 import { findRightPanel, schedulePanelResize } from "./srs/panelUtils"
 import { collectReviewCards, buildReviewQueue } from "./srs/cardCollector"
 import { extractDeckName, calculateDeckStats } from "./srs/deckUtils"
-import { closeCardBrowser } from "./srs/cardBrowser"
+import { getOrCreateFlashcardHomeBlock, cleanupFlashcardHomeBlock } from "./srs/flashcardHomeManager"
 import { registerCommands, unregisterCommands } from "./srs/registry/commands"
 import { registerUIComponents, unregisterUIComponents } from "./srs/registry/uiComponents"
 import { registerRenderers, unregisterRenderers } from "./srs/registry/renderers"
@@ -22,6 +22,7 @@ import { registerConverters, unregisterConverters } from "./srs/registry/convert
 // 插件全局状态
 let pluginName: string
 let reviewHostPanelId: string | null = null
+let reviewDeckFilter: string | null = null
 
 /**
  * 插件加载函数
@@ -34,7 +35,7 @@ export async function load(_name: string) {
   setupL10N(orca.state.locale, { "zh-CN": zhCN })
 
   console.log(`[${pluginName}] 插件已加载`)
-  registerCommands(pluginName, startReviewSession)
+  registerCommands(pluginName, startReviewSession, openFlashcardHome)
   registerUIComponents(pluginName)
   registerRenderers(pluginName)
   registerConverters(pluginName)
@@ -49,10 +50,8 @@ export async function load(_name: string) {
 export async function unload() {
   console.log(`[${pluginName}] 开始卸载插件`)
 
-  // 清理卡片浏览器组件
-  closeCardBrowser(pluginName)
-
   await cleanupReviewSessionBlock(pluginName)
+  await cleanupFlashcardHomeBlock(pluginName)
 
   unregisterConverters(pluginName)
   unregisterRenderers(pluginName)
@@ -71,6 +70,7 @@ export async function unload() {
  */
 async function startReviewSession(deckName?: string) {
   try {
+    reviewDeckFilter = deckName ?? null
     const reviewSessionBlockId = await getOrCreateReviewSessionBlock(pluginName)
     const activePanelId = orca.state.activePanel
 
@@ -119,11 +119,69 @@ async function startReviewSession(deckName?: string) {
   }
 }
 
+// ========================================
+// Flashcard Home
+// ========================================
+
+/**
+ * 打开 Flashcard Home 块
+ */
+async function openFlashcardHome() {
+  try {
+    const flashcardHomeBlockId = await getOrCreateFlashcardHomeBlock(pluginName)
+    const activePanelId = orca.state.activePanel
+
+    if (!activePanelId) {
+      orca.notify("warn", "当前没有可用的面板", { title: "Flashcard Home" })
+      return
+    }
+
+    let rightPanelId = findRightPanel(orca.state.panels, activePanelId)
+
+    if (!rightPanelId) {
+      rightPanelId = orca.nav.addTo(activePanelId, "right", {
+        view: "block",
+        viewArgs: { blockId: flashcardHomeBlockId },
+        viewState: {}
+      })
+
+      if (!rightPanelId) {
+        orca.notify("error", "无法创建侧边面板", { title: "Flashcard Home" })
+        return
+      }
+
+      schedulePanelResize(activePanelId, pluginName)
+    } else {
+      orca.nav.goTo("block", { blockId: flashcardHomeBlockId }, rightPanelId)
+    }
+
+    const targetPanelId = rightPanelId
+    if (targetPanelId) {
+      setTimeout(() => {
+        orca.nav.switchFocusTo(targetPanelId)
+      }, 80)
+    }
+
+    orca.notify("success", "Flashcard Home 已在右侧面板打开", { title: "Flashcard Home" })
+    console.log(`[${pluginName}] Flashcard Home opened in panel ${targetPanelId}`)
+  } catch (error) {
+    console.error(`[${pluginName}] 打开 Flashcard Home 失败:`, error)
+    orca.notify("error", `无法打开 Flashcard Home: ${error}`, { title: "Flashcard Home" })
+  }
+}
+
 /**
  * 获取复习宿主面板 ID
  */
 export function getReviewHostPanelId(): string | null {
   return reviewHostPanelId
+}
+
+/**
+ * 获取当前复习会话的 deck 过滤器
+ */
+export function getReviewDeckFilter(): string | null {
+  return reviewDeckFilter
 }
 
 /**

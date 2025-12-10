@@ -68,7 +68,8 @@ flowchart TD
 ```typescript
 export function registerCommands(
   pluginName: string,
-  startReviewSession: () => Promise<void>
+  startReviewSession: (deckName?: string) => Promise<void>,
+  openFlashcardHome: () => Promise<void>
 ): void
 
 export function unregisterCommands(pluginName: string): void
@@ -80,7 +81,7 @@ export function unregisterCommands(pluginName: string): void
 |---------|------|------|----------|
 | `${pluginName}.startReviewSession` | 普通命令 | 开始复习会话 | `startReviewSession` (从 main.ts 传入) |
 | `${pluginName}.scanCardsFromTags` | 普通命令 | 扫描带标签的块 | `scanCardsFromTags` (从 cardCreator 导入) |
-| `${pluginName}.openCardBrowser` | 普通命令 | 打开卡片浏览器 | `openCardBrowser` (从 cardBrowser 导入) |
+| `${pluginName}.openFlashcardHome` | 普通命令 | 打开 Flashcard Home 面板 | `openFlashcardHome`（从 main.ts 传入） |
 | `${pluginName}.makeCardFromBlock` | 编辑器命令 | 将块转为卡片 | `makeCardFromBlock` (从 cardCreator 导入) |
 | `${pluginName}.createCloze` | 编辑器命令 | 创建 Cloze 填空 | `createCloze` (从 clozeUtils 导入) |
 
@@ -90,7 +91,6 @@ export function unregisterCommands(pluginName: string): void
 import type { Block } from "../../orca.d.ts"
 import { BlockWithRepr } from "../blockUtils"
 import { scanCardsFromTags, makeCardFromBlock } from "../cardCreator"
-import { openCardBrowser } from "../cardBrowser"
 import { createCloze } from "../clozeUtils"
 ```
 
@@ -154,7 +154,7 @@ orca.commands.registerEditorCommand(
 import { registerCommands, unregisterCommands } from "./srs/registry/commands"
 
 export async function load(_name: string) {
-  registerCommands(_name, startReviewSession)
+  registerCommands(_name, startReviewSession, openFlashcardHome)
 }
 
 export async function unload() {
@@ -188,7 +188,7 @@ export function unregisterUIComponents(pluginName: string): void
 | 按钮 ID | 图标 | 提示文本 | 关联命令 |
 |---------|------|----------|----------|
 | `${pluginName}.reviewButton` | `ti ti-cards` | 开始 SRS 复习 | `${pluginName}.startReviewSession` |
-| `${pluginName}.browserButton` | `ti ti-list` | 打开卡片浏览器 | `${pluginName}.openCardBrowser` |
+| `${pluginName}.browserButton` | `ti ti-list` | 打开 Flashcard Home | `${pluginName}.openFlashcardHome` |
 | `${pluginName}.clozeButton` | `ti ti-braces` | 创建 Cloze 填空 | `${pluginName}.createCloze` |
 
 #### 斜杠命令（1 个）
@@ -238,13 +238,14 @@ export function unregisterRenderers(pluginName: string): void
 
 ### 注册的渲染器
 
-#### 块渲染器（3 个）
+#### 块渲染器（4 个）
 
 | 类型 | 组件 | 可编辑 | 说明 |
 |------|------|--------|------|
 | `srs.card` | `SrsCardBlockRenderer` | 否 | SRS 卡片块渲染 |
 | `srs.cloze-card` | `SrsCardBlockRenderer` | 否 | Cloze 卡片块渲染（复用同一组件） |
 | `srs.review-session` | `SrsReviewSessionRenderer` | 否 | 复习会话块渲染 |
+| `srs.flashcard-home` | `SrsFlashcardHomeRenderer` | 否 | Flashcard Home 面板渲染 |
 
 #### Inline 渲染器（1 个）
 
@@ -258,6 +259,7 @@ export function unregisterRenderers(pluginName: string): void
 import SrsReviewSessionRenderer from "../../components/SrsReviewSessionRenderer"
 import SrsCardBlockRenderer from "../../components/SrsCardBlockRenderer"
 import ClozeInlineRenderer from "../../components/ClozeInlineRenderer"
+import SrsFlashcardHomeRenderer from "../../components/SrsFlashcardHomeRenderer"
 ```
 
 ### 关键实现细节
@@ -321,13 +323,14 @@ export function unregisterConverters(pluginName: string): void
 
 ### 注册的转换器
 
-#### 块转换器（3 个）
+#### 块转换器（4 个）
 
 | 源格式 | 目标类型 | 输出格式 |
 |--------|----------|----------|
 | `plain` | `srs.card` | `[SRS 卡片]\n题目: ${front}\n答案: ${back}` |
 | `plain` | `srs.cloze-card` | `[SRS 填空卡片]\n题目: ${front}\n答案: ${back}` |
 | `plain` | `srs.review-session` | `[SRS 复习会话面板块]` |
+| `plain` | `srs.flashcard-home` | `[SRS Flashcard Home 面板块]` |
 
 #### Inline 转换器（1 个）
 
@@ -402,6 +405,8 @@ import { registerCommands, unregisterCommands } from "./srs/registry/commands"
 import { registerUIComponents, unregisterUIComponents } from "./srs/registry/uiComponents"
 import { registerRenderers, unregisterRenderers } from "./srs/registry/renderers"
 import { registerConverters, unregisterConverters } from "./srs/registry/converters"
+import { cleanupReviewSessionBlock } from "./srs/reviewSessionManager"
+import { cleanupFlashcardHomeBlock } from "./srs/flashcardHomeManager"
 
 let pluginName: string
 
@@ -410,15 +415,15 @@ export async function load(_name: string) {
   setupL10N(orca.state.locale, { "zh-CN": zhCN })
 
   // 委托给注册模块
-  registerCommands(pluginName, startReviewSession)
+  registerCommands(pluginName, startReviewSession, openFlashcardHome)
   registerUIComponents(pluginName)
   registerRenderers(pluginName)
   registerConverters(pluginName)
 }
 
 export async function unload() {
-  closeCardBrowser(pluginName)
   await cleanupReviewSessionBlock(pluginName)
+  await cleanupFlashcardHomeBlock(pluginName)
 
   // 倒序清理（高层依赖先清理）
   unregisterConverters(pluginName)

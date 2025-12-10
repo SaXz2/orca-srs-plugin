@@ -43,10 +43,20 @@ export default function SrsReviewSessionRenderer(props: RendererProps) {
     setErrorMessage(null)
 
     try {
-      const { collectReviewCards, buildReviewQueue, getReviewHostPanelId, getPluginName } = await import("../main")
+      const {
+        collectReviewCards,
+        buildReviewQueue,
+        getReviewHostPanelId,
+        getPluginName,
+        getReviewDeckFilter
+      } = await import("../main")
       const currentPluginName = typeof getPluginName === "function" ? getPluginName() : "orca-srs"
       const allCards = await collectReviewCards(currentPluginName)
-      const queue = buildReviewQueue(allCards)
+      const deckFilter = typeof getReviewDeckFilter === "function" ? getReviewDeckFilter() : null
+      const filteredCards = deckFilter
+        ? allCards.filter(card => card.deck === deckFilter)
+        : allCards
+      const queue = buildReviewQueue(filteredCards)
       setCards(queue)
       const hostPanelId = typeof getReviewHostPanelId === "function" ? getReviewHostPanelId() : null
       setCardPanelId(hostPanelId ?? panelId)

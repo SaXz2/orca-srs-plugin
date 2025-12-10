@@ -41,3 +41,10 @@ export type DeckStats = {
   totalNew: number
   totalOverdue: number
 }
+
+export type TodayStats = {
+  pendingCount: number
+  todayCount: number
+  newCount: number
+  totalCount: number
+}

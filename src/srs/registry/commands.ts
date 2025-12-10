@@ -7,12 +7,12 @@
 import type { Block } from "../../orca.d.ts"
 import { BlockWithRepr } from "../blockUtils"
 import { scanCardsFromTags, makeCardFromBlock } from "../cardCreator"
-import { openCardBrowser } from "../cardBrowser"
 import { createCloze } from "../clozeUtils"
 
 export function registerCommands(
   pluginName: string,
-  startReviewSession: () => Promise<void>
+  startReviewSession: (deckName?: string) => Promise<void>,
+  openFlashcardHome: () => Promise<void>
 ): void {
   // 在闭包中捕获 pluginName，供 undo 函数使用
   const _pluginName = pluginName
@@ -36,12 +36,12 @@ export function registerCommands(
   )
 
   orca.commands.registerCommand(
-    `${pluginName}.openCardBrowser`,
-    () => {
-      console.log(`[${_pluginName}] 打开卡片浏览器`)
-      openCardBrowser(_pluginName)
+    `${pluginName}.openFlashcardHome`,
+    async () => {
+      console.log(`[${_pluginName}] 打开 Flashcard Home`)
+      await openFlashcardHome()
     },
-    "SRS: 打开卡片浏览器"
+    "SRS: 打开 Flashcard Home"
   )
 
   orca.commands.registerEditorCommand(
@@ -128,7 +128,7 @@ export function registerCommands(
 export function unregisterCommands(pluginName: string): void {
   orca.commands.unregisterCommand(`${pluginName}.startReviewSession`)
   orca.commands.unregisterCommand(`${pluginName}.scanCardsFromTags`)
-  orca.commands.unregisterCommand(`${pluginName}.openCardBrowser`)
+  orca.commands.unregisterCommand(`${pluginName}.openFlashcardHome`)
   orca.commands.unregisterEditorCommand(`${pluginName}.makeCardFromBlock`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createCloze`)
 }
