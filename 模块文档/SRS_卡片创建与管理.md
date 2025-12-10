@@ -29,6 +29,7 @@
 2. 父块文本作为题目（front）
 3. 第一个子块文本作为答案（back）
 4. 从 `#card` 标签的属性中读取 Deck 名称
+5. **【新增】从 `#card` 标签的 `type` 属性识别卡片类型（basic 或 cloze）**
 
 ### 核心函数
 
@@ -40,14 +41,18 @@
 flowchart TD
     A[开始扫描] --> B[获取所有带 #card 标签的块]
     B --> C{遍历每个块}
-    C --> D[已是卡片?]
-    D -->|是| E[跳过]
-    D -->|否| F[提取题目和答案]
-    F --> G[读取 Deck 属性]
-    G --> H[设置 _repr.type = srs.card]
-    H --> I[写入初始 SRS 状态]
-    I --> C
-    C --> J[显示结果通知]
+    C --> D[识别卡片类型]
+    D --> E{type = cloze?}
+    E -->|是| F[设置 _repr.type = srs.cloze-card]
+    E -->|否| G[设置 _repr.type = srs.card]
+    F --> H[已是该类型?]
+    G --> H
+    H -->|是| I[跳过]
+    H -->|否| J[提取题目和答案]
+    J --> K[读取 Deck 属性]
+    K --> L[写入初始 SRS 状态]
+    L --> C
+    C --> M[显示结果通知]
 ```
 
 #### `makeCardFromBlock(cursor)`
@@ -81,6 +86,30 @@ await orca.commands.invokeEditorCommand(
 - ✓ 支持撤销操作
 - ✓ 作为编辑器命令注册
 
+#### `extractCardType(block): "basic" | "cloze"`
+
+**【新增】** 从块的标签属性中提取卡片类型：
+
+```typescript
+// 标签属性结构
+block.refs[].data[].name === "type"
+block.refs[].data[].value // "basic" 或 "cloze"
+```
+
+**工作原理**：
+
+1. 查找 `#card` 标签引用（`ref.type === 2 && ref.alias === "card"`）
+2. 从 `ref.data` 中读取 `name === "type"` 的属性
+3. 支持单选文本和多选文本两种属性类型
+4. 如果值为 `"cloze"`（不区分大小写），返回 `"cloze"`
+5. 其他情况默认返回 `"basic"`
+
+**应用场景**：
+
+- 区分填空卡（cloze）和普通卡片（basic）
+- 在复习界面使用不同的渲染方式
+- 使用 cloze 按钮创建填空时自动设置为 `"cloze"`
+
 #### `extractDeckName(block): string`
 
 从块的标签属性中提取 Deck 名称：
@@ -90,6 +119,46 @@ await orca.commands.invokeEditorCommand(
 block.refs[].data[].name === "deck"
 block.refs[].data[].value // Deck 名称
 ```
+
+### 卡片类型管理
+
+**【新增】** 插件支持两种卡片类型：
+
+| 类型 | _repr.type | 标签属性 | 用途 |
+|------|-----------|---------|------|
+| **Basic** | `srs.card` | `type: "basic"` 或未设置 | 普通问答卡片 |
+| **Cloze** | `srs.cloze-card` | `type: "cloze"` | 填空卡片 |
+
+#### 用户操作流程
+
+1. 在 Orca 标签页面为 `#card` 标签定义 `type` 属性（类型：单选/多选文本）
+2. 添加可选值：`"basic"` 和 `"cloze"`
+3. 给块打 `#card` 标签后，从下拉菜单选择类型
+4. 或者使用 Cloze 按钮创建填空时自动设置为 `"cloze"`
+
+#### 技术实现
+
+```typescript
+// 1. 识别卡片类型
+const cardType = extractCardType(block)  // "basic" 或 "cloze"
+
+// 2. 设置对应的 _repr.type
+const reprType = cardType === "cloze" ? "srs.cloze-card" : "srs.card"
+
+// 3. 更新块的 _repr
+block._repr = {
+  type: reprType,
+  front: front,
+  back: back,
+  cardType: cardType  // 方便后续使用
+}
+```
+
+#### 自动识别流程
+
+- **扫描时**：`scanCardsFromTags()` 自动读取每个块的 `type` 属性
+- **创建时**：`makeCardFromBlock()` 在添加标签后检查 `type` 属性
+- **复习时**：复习队列同时收集 `srs.card` 和 `srs.cloze-card` 两种类型
 
 ### Deck 管理
 

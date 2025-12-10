@@ -211,6 +211,15 @@ export async function load(_name: string) {
     false
   )
 
+  // 注册 cloze 卡片渲染器（使用相同的渲染器组件）
+  orca.renderers.registerBlock(
+    "srs.cloze-card",
+    false,
+    SrsCardBlockRenderer,
+    [],
+    false
+  )
+
   orca.renderers.registerBlock(
     "srs.review-session",
     false,
@@ -238,6 +247,17 @@ export async function load(_name: string) {
       const front = repr.front || "（无题目）"
       const back = repr.back || "（无答案）"
       return `[SRS 卡片]\n题目: ${front}\n答案: ${back}`
+    }
+  )
+
+  // 注册 cloze 卡片转换器
+  orca.converters.registerBlock(
+    "plain",
+    "srs.cloze-card",
+    (blockContent: BlockForConversion, repr: Repr) => {
+      const front = repr.front || "（无题目）"
+      const back = repr.back || "（无答案）"
+      return `[SRS 填空卡片]\n题目: ${front}\n答案: ${back}`
     }
   )
 

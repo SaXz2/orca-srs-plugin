@@ -8,6 +8,74 @@ import type { Block } from "../orca.d.ts"
 import type { ReviewCard, DeckInfo, DeckStats } from "./types"
 
 /**
+ * 从块的标签属性系统中提取卡片类型
+ *
+ * 工作原理：
+ * 1. 找到 type=2 (RefType.Property) 且 alias="card" 的引用
+ * 2. 从引用的 data 数组中找到 name="type" 的属性
+ * 3. 返回该属性的 value，如果不存在返回 "basic"
+ *
+ * 用户操作流程：
+ * 1. 在 Orca 标签页面为 #card 标签定义属性 "type"（类型：单选/多选文本）
+ * 2. 添加可选值（如 "basic", "cloze"）
+ * 3. 给块打 #card 标签后，从下拉菜单选择 type 值
+ * 4. 或者使用 cloze 按钮时自动设置为 "cloze"
+ *
+ * @param block - 块对象
+ * @returns 卡片类型，"basic" 或 "cloze"，默认为 "basic"
+ */
+export function extractCardType(block: Block): "basic" | "cloze" {
+  // 边界情况：块没有引用
+  if (!block.refs || block.refs.length === 0) {
+    return "basic"
+  }
+
+  // 1. 找到 #card 标签引用
+  const cardRef = block.refs.find(ref =>
+    ref.type === 2 &&      // RefType.Property（标签引用）
+    ref.alias === "card"   // 标签名称为 "card"
+  )
+
+  // 边界情况：没有找到 #card 标签引用
+  if (!cardRef) {
+    return "basic"
+  }
+
+  // 边界情况：标签引用没有关联数据
+  if (!cardRef.data || cardRef.data.length === 0) {
+    return "basic"
+  }
+
+  // 2. 从标签关联数据中读取 type 属性
+  const typeProperty = cardRef.data.find(d => d.name === "type")
+
+  // 边界情况：没有设置 type 属性
+  if (!typeProperty) {
+    return "basic"
+  }
+
+  // 3. 返回 type 值
+  const typeValue = typeProperty.value
+
+  // 处理多选类型（数组）和单选类型（字符串）
+  if (Array.isArray(typeValue)) {
+    // 多选类型：取数组的第一个值
+    if (typeValue.length === 0 || !typeValue[0] || typeof typeValue[0] !== "string") {
+      return "basic"
+    }
+    const firstValue = typeValue[0].trim().toLowerCase()
+    return firstValue === "cloze" ? "cloze" : "basic"
+  } else if (typeof typeValue === "string") {
+    // 单选类型：直接使用字符串
+    const trimmedValue = typeValue.trim().toLowerCase()
+    return trimmedValue === "cloze" ? "cloze" : "basic"
+  }
+
+  // 其他类型：默认为 basic
+  return "basic"
+}
+
+/**
  * 从块的标签属性系统中提取 deck 名称
  *
  * 工作原理：

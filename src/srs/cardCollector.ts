@@ -70,7 +70,12 @@ export async function collectSrsBlocks(pluginName: string = "srs-plugin"): Promi
   }
   
   const stateBlocks = Object.values(orca.state.blocks || {})
-    .filter((b): b is BlockWithRepr => !!b && (b as BlockWithRepr)._repr?.type === "srs.card")
+    .filter((b): b is BlockWithRepr => {
+      if (!b) return false
+      const reprType = (b as BlockWithRepr)._repr?.type
+      // 支持两种卡片类型：basic 和 cloze
+      return reprType === "srs.card" || reprType === "srs.cloze-card"
+    })
 
   const merged = new Map<DbId, BlockWithRepr>()
   for (const block of [...(tagged || []), ...stateBlocks]) {

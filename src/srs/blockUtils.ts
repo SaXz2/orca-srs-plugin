@@ -27,8 +27,10 @@ export function removeHashTags(text: string): string {
  * @returns 是否为 SRS 卡片
  */
 export function isSrsCardBlock(block: BlockWithRepr): boolean {
+  const reprType = block._repr?.type
   return (
-    block._repr?.type === "srs.card" ||
+    reprType === "srs.card" ||
+    reprType === "srs.cloze-card" ||
     block.properties?.some(prop => prop.name === "srs.isCard")
   )
 }

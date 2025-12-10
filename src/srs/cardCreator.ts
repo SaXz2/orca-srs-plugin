@@ -6,7 +6,7 @@
 
 import type { Block, CursorData } from "../orca.d.ts"
 import { BlockWithRepr, resolveFrontBack } from "./blockUtils"
-import { extractDeckName } from "./deckUtils"
+import { extractDeckName, extractCardType } from "./deckUtils"
 import { writeInitialSrsState } from "./storage"
 
 /**
@@ -96,9 +96,13 @@ export async function scanCardsFromTags(pluginName: string) {
     for (const block of allTaggedBlocks) {
       const blockWithRepr = block as BlockWithRepr
 
-      // 如果已经是 srs.card 类型，跳过
-      if (blockWithRepr._repr?.type === "srs.card") {
-        console.log(`[${pluginName}] 跳过：块 #${block.id} 已经是 SRS 卡片`)
+      // 识别卡片类型（basic 或 cloze）
+      const cardType = extractCardType(block)
+      const reprType = cardType === "cloze" ? "srs.cloze-card" : "srs.card"
+
+      // 如果已经是对应的卡片类型，跳过
+      if (blockWithRepr._repr?.type === reprType) {
+        console.log(`[${pluginName}] 跳过：块 #${block.id} 已经是 ${cardType} 卡片`)
         skippedCount++
         continue
       }
@@ -110,10 +114,11 @@ export async function scanCardsFromTags(pluginName: string) {
 
       // 设置 _repr（直接修改，Valtio 会触发响应式更新）
       blockWithRepr._repr = {
-        type: "srs.card",
+        type: reprType,
         front: front,
         back: back,
-        deck: deckName
+        deck: deckName,
+        cardType: cardType  // 添加 cardType 字段，方便后续使用
       }
 
       // 设置初始 SRS 属性（如果块还没有这些属性）
@@ -126,6 +131,7 @@ export async function scanCardsFromTags(pluginName: string) {
       }
 
       console.log(`[${pluginName}] 已转换：块 #${block.id}`)
+      console.log(`  卡片类型: ${cardType}`)
       console.log(`  题目: ${front}`)
       console.log(`  答案: ${back}`)
       if (deckName) {
@@ -223,23 +229,34 @@ export async function makeCardFromBlock(cursor: CursorData, pluginName: string) 
   console.log(`[${pluginName}] 题目（front）: "${front}"`)
   console.log(`[${pluginName}] 答案（back）: "${back}"`)
 
+  // 识别卡片类型（basic 或 cloze）
+  // 重新获取块以获取最新的 refs（包括刚添加的标签）
+  const updatedBlock = orca.state.blocks[blockId] as BlockWithRepr
+  const cardType = extractCardType(updatedBlock)
+  const reprType = cardType === "cloze" ? "srs.cloze-card" : "srs.card"
+
+  console.log(`[${pluginName}] 卡片类型: ${cardType}`)
+  console.log(`[${pluginName}] _repr.type: ${reprType}`)
+
   // 修改块的 _repr（Valtio 会自动触发响应式更新）
   block._repr = {
-    type: "srs.card",
+    type: reprType,
     front: front,
-    back: back
+    back: back,
+    cardType: cardType
   }
 
   await writeInitialSrsState(blockId)
 
-  console.log(`[${pluginName}] ✓ 块 #${blockId} 已转换为 SRS 卡片`)
+  console.log(`[${pluginName}] ✓ 块 #${blockId} 已转换为 ${cardType} SRS 卡片`)
   console.log(`[${pluginName}] 最终 block._repr:`, block._repr)
   console.log(`[${pluginName}] 最终 block.refs:`, block.refs)
 
   // 显示通知
+  const cardTypeLabel = cardType === "cloze" ? "填空卡片" : "记忆卡片"
   orca.notify(
     "success",
-    "已添加 #card 标签并转换为 SRS 记忆卡片",
+    `已添加 #card 标签并转换为 SRS ${cardTypeLabel}`,
     { title: "SRS" }
   )
 
