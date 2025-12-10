@@ -19,6 +19,17 @@ type SrsReviewSessionProps = {
   pluginName?: string
 }
 
+/**
+ * 格式化日期为简单的"月-日"格式
+ * @param date - 日期对象
+ * @returns 格式化后的字符串，如 "12-10"
+ */
+function formatSimpleDate(date: Date): string {
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  return `${month}-${day}`
+}
+
 export default function SrsReviewSession({
   cards,
   onClose,
@@ -121,7 +132,7 @@ export default function SrsReviewSession({
 
     const clozeLabel = currentCard.clozeNumber ? ` [c${currentCard.clozeNumber}]` : ""
     setLastLog(
-      `评分 ${grade.toUpperCase()}${clozeLabel} -> 下次 ${result.state.due.toLocaleString()}，间隔 ${result.state.interval} 天，稳定度 ${result.state.stability.toFixed(2)}`
+      `评分 ${grade.toUpperCase()}${clozeLabel} -> 下次 ${formatSimpleDate(result.state.due)}，间隔 ${result.state.interval} 天`
     )
 
     setReviewedCount((prev: number) => prev + 1)

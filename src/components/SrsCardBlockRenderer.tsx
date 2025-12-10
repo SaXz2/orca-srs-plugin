@@ -107,9 +107,14 @@ export default function SrsCardBlockRenderer({
     setShowAnswer(false)
 
     // 显示通知
+    const formatSimpleDate = (date: Date) => {
+      const month = date.getMonth() + 1
+      const day = date.getDate()
+      return `${month}-${day}`
+    }
     orca.notify(
       "success",
-      `评分已记录：${grade}，下次 ${result.state.due.toLocaleString()}（间隔 ${result.state.interval} 天）`,
+      `评分已记录：${grade}，下次 ${formatSimpleDate(result.state.due)}（间隔 ${result.state.interval} 天）`,
       { title: "SRS 复习" }
     )
   }
@@ -477,12 +482,7 @@ export default function SrsCardBlockRenderer({
         </>
       )}
 
-      {/* TODO: 未来这里可以显示 SRS 状态信息 */}
-      <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--orca-color-text-2)" }}>
-        <div>下次复习：{srsInfo.due ? srsInfo.due.toLocaleString() : "未安排"}</div>
-        <div>间隔：{srsInfo.interval ?? "-"} 天，稳定度：{srsInfo.stability ?? "-"}，难度：{srsInfo.difficulty ?? "-"}</div>
-        <div>复习次数：{srsInfo.reps ?? 0}，遗忘：{srsInfo.lapses ?? 0}</div>
-      </div>
+      {/* SRS 详细信息已隐藏 */}
     </div>
   )
 

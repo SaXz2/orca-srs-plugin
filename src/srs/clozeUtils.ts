@@ -6,7 +6,7 @@
 
 import type { CursorData, Block, ContentFragment } from "../orca.d.ts"
 import { BlockWithRepr } from "./blockUtils"
-import { writeInitialSrsState, writeInitialClozeSrsState } from "./storage"
+import { writeInitialClozeSrsState } from "./storage"
 
 /**
  * 将包含 {cN:: 文本} 格式的纯文本解析为 ContentFragment 数组
@@ -300,7 +300,14 @@ export async function createCloze(
 
       // 获取块中所有的 cloze 编号
       const clozeNumbers = getAllClozeNumbers(finalBlock.content, pluginName)
-      console.log(`[${pluginName}] 块 #${blockId} 包含填空: ${clozeNumbers.join(", ")}`)
+
+      // 设置 srs.isCard 属性（持久化标记，用于 collectReviewCards 识别）
+      await orca.commands.invokeEditorCommand(
+        "core.editor.setProperties",
+        null,
+        [blockId],
+        [{ name: "srs.isCard", value: true, type: 4 }]
+      )
 
       // 为每个填空设置分天的初始 SRS 状态
       // c1 今天到期（offset=0），c2 明天到期（offset=1），c3 后天到期（offset=2）...
@@ -308,11 +315,7 @@ export async function createCloze(
         const clozeNumber = clozeNumbers[i]
         const daysOffset = clozeNumber - 1 // c1=0天, c2=1天, c3=2天...
         await writeInitialClozeSrsState(blockId, clozeNumber, daysOffset)
-        console.log(`[${pluginName}] 填空 c${clozeNumber} 设置为 ${daysOffset} 天后到期`)
       }
-
-      console.log(`[${pluginName}] ✓ 块 #${blockId} 已自动加入复习队列（${clozeNumbers.length} 个填空）`)
-      console.log(`[${pluginName}] 最终 block._repr:`, finalBlock._repr)
     } catch (error) {
       console.error(`[${pluginName}] 自动加入复习队列失败:`, error)
       // 这个错误不影响 cloze 创建，只记录

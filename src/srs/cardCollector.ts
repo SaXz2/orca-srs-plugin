@@ -111,7 +111,6 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
       const clozeNumbers = getAllClozeNumbers(block.content, pluginName)
 
       if (clozeNumbers.length === 0) {
-        console.warn(`[${pluginName}] Cloze 卡片 #${block.id} 没有找到任何填空，跳过`)
         continue
       }
 
@@ -164,14 +163,36 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
 /**
  * 构建复习队列
  * 使用 2:1 策略交错到期卡片和新卡片
- * 
+ *
+ * 到期判断逻辑（类似 ANKI）：
+ * - 只比较日期，忽略具体的时分秒
+ * - 只要卡片的到期日期 <= 今天，就视为到期
+ * - 新卡也要检查到期时间：只有到期日期 <= 今天的新卡才会出现在队列中
+ * - 这样可以实现 cloze 卡片的分天推送：c1 今天，c2 明天，c3 后天...
+ *
  * @param cards - ReviewCard 数组
  * @returns 排序后的复习队列
  */
 export function buildReviewQueue(cards: ReviewCard[]): ReviewCard[] {
-  const today = new Date()
-  const dueCards = cards.filter(card => !card.isNew && card.srs.due.getTime() <= today.getTime())
-  const newCards = cards.filter(card => card.isNew)
+  const now = new Date()
+
+  // 获取今天的日期（零点），用于日期比较
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const todayEnd = new Date(todayStart)
+  todayEnd.setDate(todayEnd.getDate() + 1) // 明天零点
+
+  // 到期卡片：已复习过 && 到期日期 < 明天零点（即今天或更早）
+  const dueCards = cards.filter(card => {
+    if (card.isNew) return false
+    return card.srs.due.getTime() < todayEnd.getTime()
+  })
+
+  // 新卡片：未复习过 && 到期日期 < 明天零点（即今天或更早）
+  // 关键修改：新卡也要检查到期时间！
+  const newCards = cards.filter(card => {
+    if (!card.isNew) return false
+    return card.srs.due.getTime() < todayEnd.getTime()
+  })
 
   const queue: ReviewCard[] = []
   let dueIndex = 0

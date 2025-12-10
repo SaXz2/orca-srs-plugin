@@ -332,24 +332,7 @@ export default function SrsCardDemo({
         {!showAnswer ? "点击\"显示答案\"查看答案内容" : "根据记忆程度选择评分"}
       </div>
 
-      {srsInfo && (
-        <div style={{
-          marginTop: "12px",
-          fontSize: "12px",
-          color: "var(--orca-color-text-2)",
-          backgroundColor: "var(--orca-color-bg-2)",
-          padding: "8px 10px",
-          borderRadius: "8px"
-        }}>
-          <div>下次复习：{srsInfo.due ? new Date(srsInfo.due).toLocaleString() : "未安排"}</div>
-          <div style={{ marginTop: "6px" }}>
-            间隔：{srsInfo.interval ?? "-"} 天 / 稳定度：{srsInfo.stability?.toFixed ? srsInfo.stability.toFixed(2) : srsInfo.stability} / 难度：{srsInfo.difficulty?.toFixed ? srsInfo.difficulty.toFixed(2) : srsInfo.difficulty}
-          </div>
-          <div style={{ marginTop: "4px" }}>
-            已复习：{srsInfo.reps ?? 0} 次，遗忘：{srsInfo.lapses ?? 0} 次
-          </div>
-        </div>
-      )}
+      {/* SRS 详细信息已隐藏 */}
     </div>
   )
 

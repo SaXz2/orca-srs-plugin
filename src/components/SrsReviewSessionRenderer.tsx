@@ -44,12 +44,12 @@ export default function SrsReviewSessionRenderer(props: RendererProps) {
 
     try {
       const { collectReviewCards, buildReviewQueue, getReviewHostPanelId, getPluginName } = await import("../main")
-      const allCards = await collectReviewCards()
+      const currentPluginName = typeof getPluginName === "function" ? getPluginName() : "orca-srs"
+      const allCards = await collectReviewCards(currentPluginName)
       const queue = buildReviewQueue(allCards)
       setCards(queue)
       const hostPanelId = typeof getReviewHostPanelId === "function" ? getReviewHostPanelId() : null
       setCardPanelId(hostPanelId ?? panelId)
-      const currentPluginName = typeof getPluginName === "function" ? getPluginName() : "orca-srs"
       setPluginName(currentPluginName)
     } catch (error) {
       console.error("[SRS Review Session Renderer] 加载复习队列失败:", error)

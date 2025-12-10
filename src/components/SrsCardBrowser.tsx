@@ -107,7 +107,9 @@ function DeckListView({ onSelectDeck, onStartReviewAll }: DeckListViewProps) {
     async function loadStats() {
       setIsLoading(true)
       try {
-        const cards = await collectReviewCards()
+        const { getPluginName } = await import("../main")
+        const currentPluginName = typeof getPluginName === "function" ? getPluginName() : "orca-srs"
+        const cards = await collectReviewCards(currentPluginName)
         const stats = calculateDeckStats(cards)
         setDeckStats(stats)
       } catch (error) {
