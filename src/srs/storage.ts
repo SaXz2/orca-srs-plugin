@@ -1,11 +1,39 @@
+/**
+ * SRS 数据存储模块
+ *
+ * 负责 SRS 卡片状态的读取和保存
+ * 支持两种卡片类型：
+ * - 普通卡片：属性前缀为 "srs."
+ * - Cloze 卡片：属性前缀为 "srs.cN."（N 为填空编号）
+ */
+
 import type { Block, DbId } from "../orca.d.ts"
 import { createInitialSrsState, nextReviewState } from "./algorithm"
 import type { Grade, SrsState } from "./types"
 
-const readProp = (block: Block | undefined, name: string) =>
+// ============================================================================
+// 工具函数
+// ============================================================================
+
+/**
+ * 构建属性名称
+ * @param base - 基础属性名（如 "stability", "due" 等）
+ * @param clozeNumber - 填空编号（可选，普通卡片不传）
+ * @returns 完整的属性名
+ */
+const buildPropertyName = (base: string, clozeNumber?: number): string =>
+  clozeNumber !== undefined ? `srs.c${clozeNumber}.${base}` : `srs.${base}`
+
+/**
+ * 从块属性中读取指定名称的值
+ */
+const readProp = (block: Block | undefined, name: string): any =>
   block?.properties?.find(prop => prop.name === name)?.value
 
-const parseNumber = (value: any, fallback: number) => {
+/**
+ * 解析数字值，无效时返回默认值
+ */
+const parseNumber = (value: any, fallback: number): number => {
   if (typeof value === "number") return value
   if (typeof value === "string") {
     const num = Number(value)
@@ -14,13 +42,31 @@ const parseNumber = (value: any, fallback: number) => {
   return fallback
 }
 
+/**
+ * 解析日期值，无效时返回默认值
+ */
 const parseDate = (value: any, fallback: Date | null): Date | null => {
   if (!value) return fallback
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime()) ? fallback : parsed
 }
 
-export const loadCardSrsState = async (blockId: DbId): Promise<SrsState> => {
+// ============================================================================
+// 核心内部函数（统一的加载/保存逻辑）
+// ============================================================================
+
+/**
+ * 内部函数：加载 SRS 状态
+ * 统一处理普通卡片和 Cloze 卡片的状态加载
+ *
+ * @param blockId - 块 ID
+ * @param clozeNumber - 填空编号（可选，普通卡片不传）
+ * @returns SRS 状态
+ */
+const loadSrsStateInternal = async (
+  blockId: DbId,
+  clozeNumber?: number
+): Promise<SrsState> => {
   const now = new Date()
   const initial = createInitialSrsState(now)
   const block = (await orca.invokeBackend("get-block", blockId)) as Block | undefined
@@ -29,48 +75,100 @@ export const loadCardSrsState = async (blockId: DbId): Promise<SrsState> => {
     return initial
   }
 
+  // 使用统一的属性名构建函数
+  const getPropValue = (base: string) =>
+    readProp(block, buildPropertyName(base, clozeNumber))
+
   return {
-    stability: parseNumber(readProp(block, "srs.stability"), initial.stability),
-    difficulty: parseNumber(readProp(block, "srs.difficulty"), initial.difficulty),
-    interval: parseNumber(readProp(block, "srs.interval"), initial.interval),
-    due: parseDate(readProp(block, "srs.due"), initial.due) ?? initial.due,
-    lastReviewed: parseDate(readProp(block, "srs.lastReviewed"), initial.lastReviewed),
-    reps: parseNumber(readProp(block, "srs.reps"), initial.reps),
-    lapses: parseNumber(readProp(block, "srs.lapses"), initial.lapses),
+    stability: parseNumber(getPropValue("stability"), initial.stability),
+    difficulty: parseNumber(getPropValue("difficulty"), initial.difficulty),
+    interval: parseNumber(getPropValue("interval"), initial.interval),
+    due: parseDate(getPropValue("due"), initial.due) ?? initial.due,
+    lastReviewed: parseDate(getPropValue("lastReviewed"), initial.lastReviewed),
+    reps: parseNumber(getPropValue("reps"), initial.reps),
+    lapses: parseNumber(getPropValue("lapses"), initial.lapses),
     state: initial.state // 状态由算法决定，读取不到时回退为初始
   }
 }
 
-export const saveCardSrsState = async (blockId: DbId, newState: SrsState) => {
+/**
+ * 内部函数：保存 SRS 状态
+ * 统一处理普通卡片和 Cloze 卡片的状态保存
+ *
+ * @param blockId - 块 ID
+ * @param newState - 新的 SRS 状态
+ * @param clozeNumber - 填空编号（可选，普通卡片不传）
+ */
+const saveSrsStateInternal = async (
+  blockId: DbId,
+  newState: SrsState,
+  clozeNumber?: number
+): Promise<void> => {
+  // 构建属性列表
+  const properties = [
+    { name: buildPropertyName("stability", clozeNumber), value: newState.stability, type: 3 },
+    { name: buildPropertyName("difficulty", clozeNumber), value: newState.difficulty, type: 3 },
+    { name: buildPropertyName("lastReviewed", clozeNumber), value: newState.lastReviewed ?? null, type: 5 },
+    { name: buildPropertyName("interval", clozeNumber), value: newState.interval, type: 3 },
+    { name: buildPropertyName("due", clozeNumber), value: newState.due, type: 5 },
+    { name: buildPropertyName("reps", clozeNumber), value: newState.reps, type: 3 },
+    { name: buildPropertyName("lapses", clozeNumber), value: newState.lapses, type: 3 }
+  ]
+
+  // 普通卡片需要额外添加 isCard 标记
+  if (clozeNumber === undefined) {
+    properties.unshift({ name: "srs.isCard", value: true as any, type: 4 })
+  }
+
   await orca.commands.invokeEditorCommand(
     "core.editor.setProperties",
     null,
     [blockId],
-    [
-      { name: "srs.isCard", value: true, type: 4 },
-      { name: "srs.stability", value: newState.stability, type: 3 },
-      { name: "srs.difficulty", value: newState.difficulty, type: 3 },
-      { name: "srs.lastReviewed", value: newState.lastReviewed ?? null, type: 5 },
-      { name: "srs.interval", value: newState.interval, type: 3 },
-      { name: "srs.due", value: newState.due, type: 5 },
-      { name: "srs.reps", value: newState.reps, type: 3 },
-      { name: "srs.lapses", value: newState.lapses, type: 3 }
-    ]
+    properties
   )
 }
 
-export const writeInitialSrsState = async (blockId: DbId, now: Date = new Date()) => {
+// ============================================================================
+// 普通卡片 API
+// ============================================================================
+
+/**
+ * 加载普通卡片的 SRS 状态
+ */
+export const loadCardSrsState = (blockId: DbId): Promise<SrsState> =>
+  loadSrsStateInternal(blockId)
+
+/**
+ * 保存普通卡片的 SRS 状态
+ */
+export const saveCardSrsState = (blockId: DbId, newState: SrsState): Promise<void> =>
+  saveSrsStateInternal(blockId, newState)
+
+/**
+ * 为普通卡片写入初始 SRS 状态
+ */
+export const writeInitialSrsState = async (
+  blockId: DbId,
+  now: Date = new Date()
+): Promise<SrsState> => {
   const initial = createInitialSrsState(now)
   await saveCardSrsState(blockId, initial)
   return initial
 }
 
+/**
+ * 更新普通卡片的 SRS 状态（评分后）
+ */
 export const updateSrsState = async (blockId: DbId, grade: Grade) => {
   const prev = await loadCardSrsState(blockId)
   const result = nextReviewState(prev, grade)
   await saveCardSrsState(blockId, result.state)
   return result
 }
+
+// ============================================================================
+// Cloze 卡片 API
+// ============================================================================
 
 /**
  * 加载 Cloze 卡片某个填空的 SRS 状态
@@ -81,28 +179,10 @@ export const updateSrsState = async (blockId: DbId, grade: Grade) => {
  * @param clozeNumber - 填空编号（1, 2, 3...）
  * @returns SRS 状态
  */
-export const loadClozeSrsState = async (blockId: DbId, clozeNumber: number): Promise<SrsState> => {
-  const now = new Date()
-  const initial = createInitialSrsState(now)
-  const block = (await orca.invokeBackend("get-block", blockId)) as Block | undefined
-
-  if (!block) {
-    return initial
-  }
-
-  const prefix = `srs.c${clozeNumber}.`
-
-  return {
-    stability: parseNumber(readProp(block, `${prefix}stability`), initial.stability),
-    difficulty: parseNumber(readProp(block, `${prefix}difficulty`), initial.difficulty),
-    interval: parseNumber(readProp(block, `${prefix}interval`), initial.interval),
-    due: parseDate(readProp(block, `${prefix}due`), initial.due) ?? initial.due,
-    lastReviewed: parseDate(readProp(block, `${prefix}lastReviewed`), initial.lastReviewed),
-    reps: parseNumber(readProp(block, `${prefix}reps`), initial.reps),
-    lapses: parseNumber(readProp(block, `${prefix}lapses`), initial.lapses),
-    state: initial.state
-  }
-}
+export const loadClozeSrsState = (
+  blockId: DbId,
+  clozeNumber: number
+): Promise<SrsState> => loadSrsStateInternal(blockId, clozeNumber)
 
 /**
  * 保存 Cloze 卡片某个填空的 SRS 状态
@@ -111,24 +191,11 @@ export const loadClozeSrsState = async (blockId: DbId, clozeNumber: number): Pro
  * @param clozeNumber - 填空编号
  * @param newState - 新的 SRS 状态
  */
-export const saveClozeSrsState = async (blockId: DbId, clozeNumber: number, newState: SrsState) => {
-  const prefix = `srs.c${clozeNumber}.`
-
-  await orca.commands.invokeEditorCommand(
-    "core.editor.setProperties",
-    null,
-    [blockId],
-    [
-      { name: `${prefix}stability`, value: newState.stability, type: 3 },
-      { name: `${prefix}difficulty`, value: newState.difficulty, type: 3 },
-      { name: `${prefix}lastReviewed`, value: newState.lastReviewed ?? null, type: 5 },
-      { name: `${prefix}interval`, value: newState.interval, type: 3 },
-      { name: `${prefix}due`, value: newState.due, type: 5 },
-      { name: `${prefix}reps`, value: newState.reps, type: 3 },
-      { name: `${prefix}lapses`, value: newState.lapses, type: 3 }
-    ]
-  )
-}
+export const saveClozeSrsState = (
+  blockId: DbId,
+  clozeNumber: number,
+  newState: SrsState
+): Promise<void> => saveSrsStateInternal(blockId, newState, clozeNumber)
 
 /**
  * 为 Cloze 卡片的某个填空写入初始 SRS 状态
@@ -141,7 +208,7 @@ export const writeInitialClozeSrsState = async (
   blockId: DbId,
   clozeNumber: number,
   daysOffset: number = 0
-) => {
+): Promise<SrsState> => {
   const now = new Date()
   // 设置到期时间为今天 + daysOffset 天
   const dueDate = new Date(now)
@@ -160,7 +227,11 @@ export const writeInitialClozeSrsState = async (
  * @param clozeNumber - 填空编号
  * @param grade - 评分
  */
-export const updateClozeSrsState = async (blockId: DbId, clozeNumber: number, grade: Grade) => {
+export const updateClozeSrsState = async (
+  blockId: DbId,
+  clozeNumber: number,
+  grade: Grade
+) => {
   const prev = await loadClozeSrsState(blockId, clozeNumber)
   const result = nextReviewState(prev, grade)
   await saveClozeSrsState(blockId, clozeNumber, result.state)

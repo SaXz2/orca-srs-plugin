@@ -18,7 +18,9 @@
 
 ### 存储机制
 
-SRS 状态通过 Orca 的块属性（`block.properties`）存储：
+SRS 状态通过 Orca 的块属性（`block.properties`）存储。
+
+#### 普通卡片属性
 
 | 属性名             | 类型     | 说明                  |
 | ------------------ | -------- | --------------------- |
@@ -31,7 +33,37 @@ SRS 状态通过 Orca 的块属性（`block.properties`）存储：
 | `srs.reps`         | Number   | 复习次数              |
 | `srs.lapses`       | Number   | 遗忘次数              |
 
-### 核心函数
+#### Cloze 卡片属性
+
+Cloze 卡片的每个填空有独立的 SRS 状态，属性名包含填空编号：
+
+| 属性名（示例 c1）     | 类型     | 说明              |
+| --------------------- | -------- | ----------------- |
+| `srs.c1.stability`    | Number   | c1 的记忆稳定度   |
+| `srs.c1.difficulty`   | Number   | c1 的记忆难度     |
+| `srs.c1.interval`     | Number   | c1 的间隔天数     |
+| `srs.c1.due`          | DateTime | c1 的下次复习时间 |
+| `srs.c1.lastReviewed` | DateTime | c1 的上次复习时间 |
+| `srs.c1.reps`         | Number   | c1 的复习次数     |
+| `srs.c1.lapses`       | Number   | c1 的遗忘次数     |
+
+### 内部函数
+
+模块内部使用统一的函数处理普通卡片和 Cloze 卡片：
+
+#### `buildPropertyName(base, clozeNumber?): string`
+
+构建属性名称。普通卡片返回 `srs.{base}`，Cloze 卡片返回 `srs.c{N}.{base}`。
+
+#### `loadSrsStateInternal(blockId, clozeNumber?): Promise<SrsState>`
+
+内部加载函数，统一处理普通卡片和 Cloze 卡片的状态加载。
+
+#### `saveSrsStateInternal(blockId, newState, clozeNumber?): Promise<void>`
+
+内部保存函数，统一处理普通卡片和 Cloze 卡片的状态保存。
+
+### 公开 API - 普通卡片
 
 #### `loadCardSrsState(blockId): Promise<SrsState>`
 
@@ -67,16 +99,41 @@ const result = await updateSrsState(blockId, "good");
 console.log(`新间隔：${result.state.interval} 天`);
 ```
 
-### 数据流
+### 公开 API - Cloze 卡片
 
-```mermaid
-flowchart LR
-    A[用户评分] --> B[updateSrsState]
-    B --> C[loadCardSrsState]
-    C --> D[从 block.properties 读取]
-    D --> E[nextReviewState]
-    E --> F[saveCardSrsState]
-    F --> G[写入 block.properties]
+#### `loadClozeSrsState(blockId, clozeNumber): Promise<SrsState>`
+
+加载 Cloze 卡片某个填空的 SRS 状态。
+
+```typescript
+const state = await loadClozeSrsState(blockId, 1); // 加载 c1 的状态
+```
+
+#### `saveClozeSrsState(blockId, clozeNumber, newState): Promise<void>`
+
+保存 Cloze 卡片某个填空的 SRS 状态。
+
+```typescript
+await saveClozeSrsState(blockId, 1, newState);
+```
+
+#### `writeInitialClozeSrsState(blockId, clozeNumber, daysOffset?): Promise<SrsState>`
+
+为 Cloze 卡片的某个填空写入初始状态，支持设置到期时间偏移。
+
+```typescript
+// c1 今天到期，c2 明天到期，c3 后天到期
+await writeInitialClozeSrsState(blockId, 1, 0);
+await writeInitialClozeSrsState(blockId, 2, 1);
+await writeInitialClozeSrsState(blockId, 3, 2);
+```
+
+#### `updateClozeSrsState(blockId, clozeNumber, grade): Promise<{state, log}>`
+
+更新 Cloze 卡片某个填空的 SRS 状态。
+
+```typescript
+const result = await updateClozeSrsState(blockId, 1, "good");
 ```
 
 ### 属性类型映射
