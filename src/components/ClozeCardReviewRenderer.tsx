@@ -24,6 +24,7 @@ type ClozeCardReviewRendererProps = {
   inSidePanel?: boolean
   panelId?: string
   pluginName: string
+  clozeNumber?: number  // 当前复习的填空编号（仅隐藏该编号的填空）
 }
 
 /**
@@ -32,11 +33,13 @@ type ClozeCardReviewRendererProps = {
  * @param fragments - 内容片段数组
  * @param showAnswers - 是否显示答案（true = 显示答案，false = 显示 [...]）
  * @param pluginName - 插件名称（用于识别 cloze fragment）
+ * @param currentClozeNumber - 当前复习的填空编号（仅隐藏该编号的填空，其他填空显示答案）
  */
 function renderFragments(
   fragments: ContentFragment[] | undefined,
   showAnswers: boolean,
-  pluginName: string
+  pluginName: string,
+  currentClozeNumber?: number
 ): React.ReactNode[] {
   if (!fragments || fragments.length === 0) {
     return [<span key="empty">（空白内容）</span>]
@@ -50,7 +53,15 @@ function renderFragments(
 
     // Cloze 片段
     if (fragment.t === `${pluginName}.cloze`) {
-      if (showAnswers) {
+      const fragmentClozeNumber = (fragment as any).clozeNumber
+
+      // 判断是否应该隐藏此填空
+      // 如果 currentClozeNumber 存在，只隐藏该编号的填空；否则隐藏所有填空
+      const shouldHide = currentClozeNumber
+        ? fragmentClozeNumber === currentClozeNumber
+        : true
+
+      if (showAnswers || !shouldHide) {
         // 显示答案：高亮显示填空内容
         return (
           <span
@@ -105,7 +116,8 @@ export default function ClozeCardReviewRenderer({
   onJumpToCard,
   inSidePanel = false,
   panelId,
-  pluginName
+  pluginName,
+  clozeNumber
 }: ClozeCardReviewRendererProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const snapshot = useSnapshot(orca.state)
@@ -123,15 +135,15 @@ export default function ClozeCardReviewRenderer({
     return block?.content ?? []
   }, [block?.content])
 
-  // 渲染题目（隐藏答案）
+  // 渲染题目（隐藏当前填空编号的答案）
   const questionContent = useMemo(() => {
-    return renderFragments(contentFragments, false, pluginName)
-  }, [contentFragments, pluginName])
+    return renderFragments(contentFragments, false, pluginName, clozeNumber)
+  }, [contentFragments, pluginName, clozeNumber])
 
-  // 渲染答案（显示答案）
+  // 渲染答案（显示所有填空）
   const answerContent = useMemo(() => {
-    return renderFragments(contentFragments, true, pluginName)
-  }, [contentFragments, pluginName])
+    return renderFragments(contentFragments, true, pluginName, clozeNumber)
+  }, [contentFragments, pluginName, clozeNumber])
 
   const cardContent = (
     <div className="srs-cloze-card-container" style={{
@@ -162,7 +174,7 @@ export default function ClozeCardReviewRenderer({
           gap: "4px"
         }}>
           <i className="ti ti-braces" />
-          填空卡
+          填空卡 {clozeNumber ? `c${clozeNumber}` : ""}
         </div>
 
         {blockId && onJumpToCard && (

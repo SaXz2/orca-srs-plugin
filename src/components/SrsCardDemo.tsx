@@ -99,6 +99,7 @@ type SrsCardDemoProps = {
   inSidePanel?: boolean
   panelId?: string
   pluginName?: string
+  clozeNumber?: number  // 填空卡片的填空编号
 }
 
 export default function SrsCardDemo({
@@ -112,7 +113,8 @@ export default function SrsCardDemo({
   onJumpToCard,
   inSidePanel = false,
   panelId,
-  pluginName = "orca-srs"
+  pluginName = "orca-srs",
+  clozeNumber
 }: SrsCardDemoProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const snapshot = useSnapshot(orca.state)
@@ -138,6 +140,7 @@ export default function SrsCardDemo({
         inSidePanel={inSidePanel}
         panelId={panelId}
         pluginName={pluginName}
+        clozeNumber={clozeNumber}  // 传递填空编号
       />
     )
   }

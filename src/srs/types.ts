@@ -21,6 +21,7 @@ export type ReviewCard = {
   srs: SrsState
   isNew: boolean
   deck: string  // 修改：从 deck?: string 改为必填
+  clozeNumber?: number  // 填空编号（仅 cloze 卡片使用）
 }
 
 // Deck 统计信息

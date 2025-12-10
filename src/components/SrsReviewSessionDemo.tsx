@@ -3,7 +3,7 @@
  */
 import type { DbId } from "../orca.d.ts"
 import type { Grade, ReviewCard } from "../srs/types"
-import { updateSrsState } from "../srs/storage"
+import { updateSrsState, updateClozeSrsState } from "../srs/storage"
 import SrsCardDemo from "./SrsCardDemo"
 
 // 从全局 window 对象获取 React（Orca 插件约定）
@@ -108,15 +108,20 @@ export default function SrsReviewSession({
   const handleGrade = async (grade: Grade) => {
     if (!currentCard) return
     setIsGrading(true)
-    const result = await updateSrsState(currentCard.id, grade)
+
+    // 根据卡片类型选择不同的更新函数
+    const result = currentCard.clozeNumber
+      ? await updateClozeSrsState(currentCard.id, currentCard.clozeNumber, grade)
+      : await updateSrsState(currentCard.id, grade)
 
     const updatedCard: ReviewCard = { ...currentCard, srs: result.state, isNew: false }
     const nextQueue = [...queue]
     nextQueue[currentIndex] = updatedCard
     setQueue(nextQueue)
 
+    const clozeLabel = currentCard.clozeNumber ? ` [c${currentCard.clozeNumber}]` : ""
     setLastLog(
-      `评分 ${grade.toUpperCase()} -> 下次 ${result.state.due.toLocaleString()}，间隔 ${result.state.interval} 天，稳定度 ${result.state.stability.toFixed(2)}`
+      `评分 ${grade.toUpperCase()}${clozeLabel} -> 下次 ${result.state.due.toLocaleString()}，间隔 ${result.state.interval} 天，稳定度 ${result.state.stability.toFixed(2)}`
     )
 
     setReviewedCount((prev: number) => prev + 1)
@@ -350,6 +355,7 @@ export default function SrsReviewSession({
             inSidePanel={true}
             panelId={panelId}
             pluginName={pluginName}
+            clozeNumber={currentCard.clozeNumber}
           />
         </div>
       </div>
@@ -424,6 +430,7 @@ export default function SrsReviewSession({
         onJumpToCard={handleJumpToCard}
         panelId={panelId}
         pluginName={pluginName}
+        clozeNumber={currentCard.clozeNumber}
       />
     </div>
   )

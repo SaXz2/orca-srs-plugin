@@ -6,7 +6,7 @@
 
 import type { CursorData, Block, ContentFragment } from "../orca.d.ts"
 import { BlockWithRepr } from "./blockUtils"
-import { writeInitialSrsState } from "./storage"
+import { writeInitialSrsState, writeInitialClozeSrsState } from "./storage"
 
 /**
  * 将包含 {cN:: 文本} 格式的纯文本解析为 ContentFragment 数组
@@ -92,7 +92,7 @@ function stripTrailingCardTagText(text: string): string {
 
 /**
  * 从文本中提取当前最大的 cloze 编号
- * 
+ *
  * @param text - 要检测的文本
  * @returns 当前最大的 cloze 编号，如果没有则返回 0
  */
@@ -110,6 +110,30 @@ export function getMaxClozeNumber(text: string): number {
   }
 
   return maxNumber
+}
+
+/**
+ * 从 ContentFragment 数组中提取所有 cloze 编号
+ *
+ * @param content - ContentFragment 数组
+ * @param pluginName - 插件名称
+ * @returns cloze 编号数组（去重并排序）
+ */
+export function getAllClozeNumbers(content: ContentFragment[] | undefined, pluginName: string): number[] {
+  if (!content || content.length === 0) {
+    return []
+  }
+
+  const clozeNumbers = new Set<number>()
+
+  for (const fragment of content) {
+    if (fragment.t === `${pluginName}.cloze` && typeof fragment.clozeNumber === "number") {
+      clozeNumbers.add(fragment.clozeNumber)
+    }
+  }
+
+  // 转为数组并排序
+  return Array.from(clozeNumbers).sort((a, b) => a - b)
 }
 
 /**
@@ -260,7 +284,7 @@ export async function createCloze(
     }
 
     // ========================================
-    // 自动加入复习队列（与 makeCardFromBlock 一致）
+    // 自动加入复习队列（多填空分天推送）
     // ========================================
     try {
       // 获取更新后的块
@@ -274,10 +298,20 @@ export async function createCloze(
         cardType: "cloze"
       }
 
-      // 写入初始 SRS 属性（这是关键 - 自动加入复习队列）
-      await writeInitialSrsState(blockId)
+      // 获取块中所有的 cloze 编号
+      const clozeNumbers = getAllClozeNumbers(finalBlock.content, pluginName)
+      console.log(`[${pluginName}] 块 #${blockId} 包含填空: ${clozeNumbers.join(", ")}`)
 
-      console.log(`[${pluginName}] ✓ 块 #${blockId} 已自动加入复习队列`)
+      // 为每个填空设置分天的初始 SRS 状态
+      // c1 今天到期（offset=0），c2 明天到期（offset=1），c3 后天到期（offset=2）...
+      for (let i = 0; i < clozeNumbers.length; i++) {
+        const clozeNumber = clozeNumbers[i]
+        const daysOffset = clozeNumber - 1 // c1=0天, c2=1天, c3=2天...
+        await writeInitialClozeSrsState(blockId, clozeNumber, daysOffset)
+        console.log(`[${pluginName}] 填空 c${clozeNumber} 设置为 ${daysOffset} 天后到期`)
+      }
+
+      console.log(`[${pluginName}] ✓ 块 #${blockId} 已自动加入复习队列（${clozeNumbers.length} 个填空）`)
       console.log(`[${pluginName}] 最终 block._repr:`, finalBlock._repr)
     } catch (error) {
       console.error(`[${pluginName}] 自动加入复习队列失败:`, error)

@@ -7,8 +7,9 @@
 import type { Block, DbId } from "../orca.d.ts"
 import type { ReviewCard } from "./types"
 import { BlockWithRepr, isSrsCardBlock, resolveFrontBack } from "./blockUtils"
-import { extractDeckName } from "./deckUtils"
-import { loadCardSrsState, writeInitialSrsState } from "./storage"
+import { extractDeckName, extractCardType } from "./deckUtils"
+import { loadCardSrsState, writeInitialSrsState, loadClozeSrsState, writeInitialClozeSrsState } from "./storage"
+import { getAllClozeNumbers } from "./clozeUtils"
 
 /**
  * 收集所有 SRS 块（带 #card 标签或 _repr.type="srs.card" 的块）
@@ -87,6 +88,9 @@ export async function collectSrsBlocks(pluginName: string = "srs-plugin"): Promi
 
 /**
  * 收集所有待复习的卡片
+ *
+ * 对于 Cloze 卡片，为每个填空编号生成独立的 ReviewCard
+ *
  * @param pluginName - 插件名称（用于日志），可选
  * @returns ReviewCard 数组
  */
@@ -97,23 +101,61 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
 
   for (const block of blocks) {
     if (!isSrsCardBlock(block)) continue
-    const { front, back } = resolveFrontBack(block)
-    const hasSrsProps = block.properties?.some(prop => prop.name.startsWith("srs."))
-    const srsState = hasSrsProps
-      ? await loadCardSrsState(block.id)
-      : await writeInitialSrsState(block.id, now)
 
-    // 从标签属性系统读取 deck 名称
+    // 识别卡片类型
+    const cardType = extractCardType(block)
     const deckName = extractDeckName(block)
 
-    cards.push({
-      id: block.id,
-      front,
-      back,
-      srs: srsState,
-      isNew: !srsState.lastReviewed || srsState.reps === 0,
-      deck: deckName
-    })
+    if (cardType === "cloze") {
+      // Cloze 卡片：为每个填空编号生成独立的 ReviewCard
+      const clozeNumbers = getAllClozeNumbers(block.content, pluginName)
+
+      if (clozeNumbers.length === 0) {
+        console.warn(`[${pluginName}] Cloze 卡片 #${block.id} 没有找到任何填空，跳过`)
+        continue
+      }
+
+      for (const clozeNumber of clozeNumbers) {
+        // 检查是否已有该填空的 SRS 属性
+        const hasClozeSrsProps = block.properties?.some(
+          prop => prop.name.startsWith(`srs.c${clozeNumber}.`)
+        )
+
+        const srsState = hasClozeSrsProps
+          ? await loadClozeSrsState(block.id, clozeNumber)
+          : await writeInitialClozeSrsState(block.id, clozeNumber, clozeNumber - 1)
+
+        // front 使用块文本（将在渲染时隐藏对应填空）
+        const front = block.text || ""
+
+        cards.push({
+          id: block.id,
+          front,
+          back: `（填空 c${clozeNumber}）`, // 填空卡不需要独立的 back
+          srs: srsState,
+          isNew: !srsState.lastReviewed || srsState.reps === 0,
+          deck: deckName,
+          clozeNumber // 关键：标记当前复习的填空编号
+        })
+      }
+    } else {
+      // Basic 卡片：传统的正面/反面模式
+      const { front, back } = resolveFrontBack(block)
+      const hasSrsProps = block.properties?.some(prop => prop.name.startsWith("srs."))
+      const srsState = hasSrsProps
+        ? await loadCardSrsState(block.id)
+        : await writeInitialSrsState(block.id, now)
+
+      cards.push({
+        id: block.id,
+        front,
+        back,
+        srs: srsState,
+        isNew: !srsState.lastReviewed || srsState.reps === 0,
+        deck: deckName
+        // clozeNumber 为 undefined（非 cloze 卡片）
+      })
+    }
   }
 
   return cards
