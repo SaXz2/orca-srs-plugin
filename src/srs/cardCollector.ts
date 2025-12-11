@@ -8,6 +8,7 @@ import type { Block, DbId } from "../orca.d.ts"
 import type { ReviewCard } from "./types"
 import { BlockWithRepr, isSrsCardBlock, resolveFrontBack } from "./blockUtils"
 import { extractDeckName, extractCardType } from "./deckUtils"
+import { extractCardStatus } from "./cardStatusUtils"
 import { 
   loadCardSrsState, 
   writeInitialSrsState, 
@@ -110,6 +111,13 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
 
   for (const block of blocks) {
     if (!isSrsCardBlock(block)) continue
+
+    // 过滤已暂停的卡片
+    const status = extractCardStatus(block)
+    if (status === "suspend") {
+      console.log(`[${pluginName}] collectReviewCards: 跳过已暂停的卡片 #${block.id}`)
+      continue
+    }
 
     // 识别卡片类型
     const cardType = extractCardType(block)

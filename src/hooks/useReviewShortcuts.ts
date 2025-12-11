@@ -7,6 +7,8 @@
  * - 2：hard（困难）
  * - 3：good（良好）
  * - 4：easy（简单）
+ * - b：bury（埋藏到明天）
+ * - s：suspend（暂停卡片）
  */
 
 import type { Grade } from "../srs/types"
@@ -16,12 +18,14 @@ const { useEffect, useCallback } = window.React
 /**
  * 快捷键配置
  */
-const SHORTCUTS: Record<string, Grade | "showAnswer"> = {
+const SHORTCUTS: Record<string, Grade | "showAnswer" | "bury" | "suspend"> = {
   " ": "showAnswer",  // 空格显示答案
   "1": "again",       // 忘记
   "2": "hard",        // 困难
   "3": "good",        // 良好
   "4": "easy",        // 简单
+  "b": "bury",        // 埋藏到明天
+  "s": "suspend",     // 暂停卡片
 }
 
 type UseReviewShortcutsOptions = {
@@ -33,6 +37,10 @@ type UseReviewShortcutsOptions = {
   onShowAnswer: () => void
   /** 评分回调 */
   onGrade: (grade: Grade) => void
+  /** 埋藏卡片回调 */
+  onBury?: () => void
+  /** 暂停卡片回调 */
+  onSuspend?: () => void
   /** 是否启用快捷键（默认 true） */
   enabled?: boolean
 }
@@ -49,6 +57,8 @@ type UseReviewShortcutsOptions = {
  *   isGrading,
  *   onShowAnswer: () => setShowAnswer(true),
  *   onGrade: handleGrade,
+ *   onBury: handleBury,
+ *   onSuspend: handleSuspend,
  * })
  * ```
  */
@@ -57,6 +67,8 @@ export function useReviewShortcuts({
   isGrading,
   onShowAnswer,
   onGrade,
+  onBury,
+  onSuspend,
   enabled = true,
 }: UseReviewShortcutsOptions): void {
   const handleKeyDown = useCallback(
@@ -86,6 +98,16 @@ export function useReviewShortcuts({
         if (!showAnswer && !isGrading) {
           onShowAnswer()
         }
+      } else if (action === "bury") {
+        // b 键：埋藏卡片（任何时候都可以）
+        if (!isGrading && onBury) {
+          onBury()
+        }
+      } else if (action === "suspend") {
+        // s 键：暂停卡片（任何时候都可以）
+        if (!isGrading && onSuspend) {
+          onSuspend()
+        }
       } else {
         // 数字键 1-4：评分（仅在答案已显示且未在评分中时有效）
         if (showAnswer && !isGrading) {
@@ -93,7 +115,7 @@ export function useReviewShortcuts({
         }
       }
     },
-    [showAnswer, isGrading, onShowAnswer, onGrade, enabled]
+    [showAnswer, isGrading, onShowAnswer, onGrade, onBury, onSuspend, enabled]
   )
 
   useEffect(() => {
@@ -109,3 +131,4 @@ export function useReviewShortcuts({
 }
 
 export default useReviewShortcuts
+

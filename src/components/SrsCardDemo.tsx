@@ -210,6 +210,8 @@ type SrsCardDemoProps = {
   front: string
   back: string
   onGrade: (grade: Grade) => Promise<void> | void
+  onBury?: () => void
+  onSuspend?: () => void
   onClose?: () => void
   srsInfo?: Partial<SrsState>
   isGrading?: boolean
@@ -226,6 +228,8 @@ export default function SrsCardDemo({
   front,
   back,
   onGrade,
+  onBury,
+  onSuspend,
   onClose,
   srsInfo,
   isGrading = false,
@@ -269,6 +273,8 @@ export default function SrsCardDemo({
         <ClozeCardReviewRenderer
           blockId={blockId}
           onGrade={onGrade}
+          onBury={onBury}
+          onSuspend={onSuspend}
           onClose={onClose}
           srsInfo={srsInfo}
           isGrading={isGrading}
@@ -289,6 +295,8 @@ export default function SrsCardDemo({
         <DirectionCardReviewRenderer
           blockId={blockId}
           onGrade={onGrade}
+          onBury={onBury}
+          onSuspend={onSuspend}
           onClose={onClose}
           srsInfo={srsInfo}
           isGrading={isGrading}
@@ -309,12 +317,14 @@ export default function SrsCardDemo({
     setShowAnswer(false)
   }
 
-  // 启用复习快捷键（空格显示答案，1-4 评分）
+  // 启用复习快捷键（空格显示答案，1-4 评分，b 埋藏，s 暂停）
   useReviewShortcuts({
     showAnswer,
     isGrading,
     onShowAnswer: () => setShowAnswer(true),
     onGrade: handleGrade,
+    onBury,
+    onSuspend,
   })
 
   // 预览各评分对应的间隔天数（用于按钮显示）
@@ -352,26 +362,64 @@ export default function SrsCardDemo({
       boxShadow: "0 4px 20px rgba(0,0,0,0.15)"
     }}>
 
-      {blockId && onJumpToCard && (
+      {/* 顶部工具栏：埋藏、暂停、跳转按钮 */}
+      {blockId && (
         <div style={{
           display: "flex",
           justifyContent: "flex-end",
+          gap: "8px",
           marginBottom: "12px"
         }}>
-          <Button
-            variant="soft"
-            onClick={() => onJumpToCard(blockId)}
-            style={{
-              padding: "6px 12px",
-              fontSize: "13px",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px"
-            }}
-          >
-            <i className="ti ti-arrow-right" />
-            跳转到卡片
-          </Button>
+          {onBury && (
+            <Button
+              variant="soft"
+              onClick={onBury}
+              title="埋藏到明天 (B)"
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+            >
+              <i className="ti ti-calendar-pause" />
+              埋藏
+            </Button>
+          )}
+          {onSuspend && (
+            <Button
+              variant="soft"
+              onClick={onSuspend}
+              title="暂停卡片 (S)"
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+            >
+              <i className="ti ti-player-pause" />
+              暂停
+            </Button>
+          )}
+          {onJumpToCard && (
+            <Button
+              variant="soft"
+              onClick={() => onJumpToCard(blockId)}
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+            >
+              <i className="ti ti-arrow-right" />
+              跳转到卡片
+            </Button>
+          )}
         </div>
       )}
 

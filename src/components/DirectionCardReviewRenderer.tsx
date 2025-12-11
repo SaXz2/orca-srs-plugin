@@ -20,6 +20,8 @@ import { previewIntervals, formatInterval } from "../srs/algorithm"
 interface DirectionCardReviewRendererProps {
   blockId: DbId
   onGrade: (grade: Grade) => Promise<void> | void
+  onBury?: () => void
+  onSuspend?: () => void
   onClose?: () => void
   srsInfo?: Partial<SrsState>
   isGrading?: boolean
@@ -33,6 +35,8 @@ interface DirectionCardReviewRendererProps {
 export default function DirectionCardReviewRenderer({
   blockId,
   onGrade,
+  onBury,
+  onSuspend,
   onClose,
   srsInfo,
   isGrading = false,
@@ -61,12 +65,14 @@ export default function DirectionCardReviewRenderer({
     setShowAnswer(false)
   }
 
-  // 快捷键支持
+  // 快捷键支持（空格显示答案，1-4 评分，b 埋藏，s 暂停）
   useReviewShortcuts({
     showAnswer,
     isGrading,
     onShowAnswer: () => setShowAnswer(true),
     onGrade: handleGrade,
+    onBury,
+    onSuspend,
   })
 
   // 预览间隔
@@ -148,22 +154,58 @@ export default function DirectionCardReviewRenderer({
           方向卡 ({dirLabel})
         </div>
 
-        {blockId && onJumpToCard && (
-          <Button
-            variant="soft"
-            onClick={() => onJumpToCard(blockId)}
-            style={{
-              padding: "6px 12px",
-              fontSize: "13px",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            <i className="ti ti-arrow-right" />
-            跳转到卡片
-          </Button>
-        )}
+        <div style={{ display: "flex", gap: "8px" }}>
+          {onBury && (
+            <Button
+              variant="soft"
+              onClick={onBury}
+              title="埋藏到明天 (B)"
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <i className="ti ti-calendar-pause" />
+              埋藏
+            </Button>
+          )}
+          {onSuspend && (
+            <Button
+              variant="soft"
+              onClick={onSuspend}
+              title="暂停卡片 (S)"
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <i className="ti ti-player-pause" />
+              暂停
+            </Button>
+          )}
+          {blockId && onJumpToCard && (
+            <Button
+              variant="soft"
+              onClick={() => onJumpToCard(blockId)}
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <i className="ti ti-arrow-right" />
+              跳转到卡片
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 题目区域 */}

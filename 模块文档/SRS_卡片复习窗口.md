@@ -158,14 +158,41 @@ stateDiagram-v2
 | `2`    | Hard     | 困难                 |
 | `3`    | Good     | 良好                 |
 | `4`    | Easy     | 简单                 |
+| `b`    | Bury     | 埋藏到明天           |
+| `s`    | Suspend  | 暂停卡片             |
 
-**实现**：通过 `useReviewShortcuts` Hook 实现，同时支持 Basic 和 Cloze 两种卡片类型。
+**实现**：通过 `useReviewShortcuts` Hook 实现，同时支持 Basic、Cloze 和 Direction 三种卡片类型。
 
 **注意事项**：
 
 - 快捷键仅在复习界面激活时生效
 - 在输入框、文本区域中不会触发快捷键
 - 评分中（isGrading=true）快捷键被禁用，防止重复触发
+
+### 卡片管理功能（2025-12-11 新增）
+
+#### Bury（埋藏）
+
+将卡片从今天的复习队列移除，明天重新进入调度：
+
+- **行为**：设置卡片的 `due` 时间为明天零点
+- **SRS 状态**：不改变 interval、stability、difficulty 等参数
+- **UI 按钮**：顶部工具栏"埋藏"按钮（日历暂停图标）
+- **快捷键**：`b`
+
+#### Suspend（暂停）
+
+将卡片标记为暂停状态，完全不会出现在复习队列：
+
+- **行为**：在 `#card` 标签中写入 `status=suspend` 属性
+- **恢复**：需要在卡片浏览器中手动取消暂停
+- **UI 按钮**：顶部工具栏"暂停"按钮（播放暂停图标）
+- **快捷键**：`s`
+
+**实现文件**：
+
+- [cardStatusUtils.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardStatusUtils.ts) - 卡片状态管理工具
+- [cardCollector.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardCollector.ts) - 过滤 suspended 卡片
 
 ### 全屏沉浸式复习（2025-12-11 更新）
 

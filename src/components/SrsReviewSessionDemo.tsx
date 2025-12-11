@@ -4,6 +4,7 @@
 import type { DbId } from "../orca.d.ts"
 import type { Grade, ReviewCard } from "../srs/types"
 import { updateSrsState, updateClozeSrsState, updateDirectionSrsState } from "../srs/storage"
+import { buryCard, suspendCard } from "../srs/cardStatusUtils"
 import SrsCardDemo from "./SrsCardDemo"
 
 // 从全局 window 对象获取 React（Orca 插件约定）
@@ -236,6 +237,68 @@ export default function SrsReviewSession({
     setTimeout(() => setCurrentIndex((prev: number) => prev + 1), 250)
   }
 
+  /**
+   * 埋藏卡片：将 due 时间设置为明天，不改变 SRS 状态
+   */
+  const handleBury = async () => {
+    if (!currentCard || isGrading) return
+    setIsGrading(true)
+
+    try {
+      await buryCard(
+        currentCard.id,
+        currentCard.clozeNumber,
+        currentCard.directionType
+      )
+
+      // 构建日志标签
+      let cardLabel = ""
+      if (currentCard.clozeNumber) {
+        cardLabel = ` [c${currentCard.clozeNumber}]`
+      } else if (currentCard.directionType) {
+        cardLabel = ` [${currentCard.directionType === "forward" ? "→" : "←"}]`
+      }
+
+      setLastLog(`已埋藏${cardLabel}，明天再复习`)
+      orca.notify("info", "卡片已埋藏，明天再复习", { title: "SRS 复习" })
+    } catch (error) {
+      console.error("[SRS Review Session] 埋藏卡片失败:", error)
+      orca.notify("error", `埋藏失败: ${error}`, { title: "SRS 复习" })
+    }
+
+    setIsGrading(false)
+    setTimeout(() => setCurrentIndex((prev: number) => prev + 1), 250)
+  }
+
+  /**
+   * 暂停卡片：标记为 suspend 状态，不再出现在复习队列
+   */
+  const handleSuspend = async () => {
+    if (!currentCard || isGrading) return
+    setIsGrading(true)
+
+    try {
+      await suspendCard(currentCard.id)
+
+      // 构建日志标签
+      let cardLabel = ""
+      if (currentCard.clozeNumber) {
+        cardLabel = ` [c${currentCard.clozeNumber}]`
+      } else if (currentCard.directionType) {
+        cardLabel = ` [${currentCard.directionType === "forward" ? "→" : "←"}]`
+      }
+
+      setLastLog(`已暂停${cardLabel}`)
+      orca.notify("info", "卡片已暂停，可在卡片浏览器中取消暂停", { title: "SRS 复习" })
+    } catch (error) {
+      console.error("[SRS Review Session] 暂停卡片失败:", error)
+      orca.notify("error", `暂停失败: ${error}`, { title: "SRS 复习" })
+    }
+
+    setIsGrading(false)
+    setTimeout(() => setCurrentIndex((prev: number) => prev + 1), 250)
+  }
+
   const handleJumpToCard = (blockId: DbId) => {
     if (onJumpToCard) {
       onJumpToCard(blockId)
@@ -458,6 +521,8 @@ export default function SrsReviewSession({
             front={currentCard.front}
             back={currentCard.back}
             onGrade={handleGrade}
+            onBury={handleBury}
+            onSuspend={handleSuspend}
             onClose={onClose}
             srsInfo={currentCard.srs}
             isGrading={isGrading}
@@ -535,6 +600,8 @@ export default function SrsReviewSession({
         front={currentCard.front}
         back={currentCard.back}
         onGrade={handleGrade}
+        onBury={handleBury}
+        onSuspend={handleSuspend}
         onClose={onClose}
         srsInfo={currentCard.srs}
         isGrading={isGrading}
