@@ -14,7 +14,7 @@ import { testAIConnection } from "../ai/aiService"
 
 export function registerCommands(
   pluginName: string,
-  startReviewSession: (deckName?: string) => Promise<void>,
+  startReviewSession: (deckName?: string, openInCurrentPanel?: boolean) => Promise<void>,
   openFlashcardHome: () => Promise<void>
 ): void {
   // 在闭包中捕获 pluginName，供 undo 函数使用

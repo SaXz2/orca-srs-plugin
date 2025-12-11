@@ -80,8 +80,10 @@ export async function unload() {
 
 /**
  * 显示 SRS 复习会话组件（使用真实队列）
+ * @param deckName - 可选的 Deck 名称过滤
+ * @param openInCurrentPanel - 是否在当前面板打开（默认 false，在右侧新建面板）
  */
-async function startReviewSession(deckName?: string) {
+async function startReviewSession(deckName?: string, openInCurrentPanel: boolean = false) {
   try {
     reviewDeckFilter = deckName ?? null
     const reviewSessionBlockId = await getOrCreateReviewSessionBlock(pluginName)
@@ -92,6 +94,18 @@ async function startReviewSession(deckName?: string) {
       return
     }
 
+    // 如果要求在当前面板打开（例如从 FlashcardHome 调用），直接导航到复习会话块
+    if (openInCurrentPanel) {
+      orca.nav.goTo("block", { blockId: reviewSessionBlockId }, activePanelId)
+      const message = deckName
+        ? `已打开 ${deckName} 复习会话`
+        : "复习会话已打开"
+      orca.notify("success", message, { title: "SRS 复习" })
+      console.log(`[${pluginName}] 复习会话已在当前面板启动，面板ID: ${activePanelId}`)
+      return
+    }
+
+    // 默认行为：在右侧面板打开
     reviewHostPanelId = activePanelId
 
     let rightPanelId = findRightPanel(orca.state.panels, activePanelId)

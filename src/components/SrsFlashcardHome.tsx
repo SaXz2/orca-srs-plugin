@@ -141,11 +141,11 @@ export default function SrsFlashcardHome({ panelId, blockId }: SrsFlashcardHomeP
   }, [loadData])
 
   const handleReviewAll = useCallback(() => {
-    void startReviewSession()
+    void startReviewSession(undefined, true)
   }, [])
 
   const handleReviewDeck = useCallback((deckName: string) => {
-    void startReviewSession(deckName)
+    void startReviewSession(deckName, true)
   }, [])
 
   const handleViewDeck = useCallback((deckName: string) => {

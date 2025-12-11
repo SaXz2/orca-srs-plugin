@@ -31,6 +31,32 @@ export function findRightPanel(node: any, currentPanelId: string): string | null
 }
 
 /**
+ * 在面板树中查找当前面板左侧的面板
+ * @param node - 面板树节点
+ * @param currentPanelId - 当前面板 ID
+ * @returns 左侧面板 ID，如果不存在则返回 null
+ */
+export function findLeftPanel(node: any, currentPanelId: string): string | null {
+  if (!node) return null
+
+  if (node.type === "hsplit" && node.children?.length === 2) {
+    const [leftPanel, rightPanel] = node.children
+    if (containsPanel(rightPanel, currentPanelId)) {
+      return typeof leftPanel?.id === "string" ? leftPanel.id : extractPanelId(leftPanel)
+    }
+  }
+
+  if (node.children) {
+    for (const child of node.children) {
+      const result = findLeftPanel(child, currentPanelId)
+      if (result) return result
+    }
+  }
+
+  return null
+}
+
+/**
  * 检查面板树节点是否包含指定面板
  * @param node - 面板树节点
  * @param panelId - 要查找的面板 ID

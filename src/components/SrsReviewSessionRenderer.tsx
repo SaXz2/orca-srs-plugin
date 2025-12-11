@@ -77,16 +77,36 @@ export default function SrsReviewSessionRenderer(props: RendererProps) {
 
   const handleJumpToCard = async (cardBlockId: DbId) => {
     try {
-      const { getReviewHostPanelId } = await import("../main")
-      const hostPanelId = typeof getReviewHostPanelId === "function" ? getReviewHostPanelId() : null
-
-      if (hostPanelId) {
-        orca.nav.goTo("block", { blockId: cardBlockId }, hostPanelId)
-        orca.nav.switchFocusTo(hostPanelId)
-        orca.notify("info", "已在主面板打开卡片", { title: "SRS 复习" })
+      const { findLeftPanel, schedulePanelResize } = await import("../srs/panelUtils")
+      const { getPluginName } = await import("../main")
+      const currentPluginName = typeof getPluginName === "function" ? getPluginName() : "orca-srs"
+      
+      // 查找当前面板（复习面板）左侧是否已有面板
+      let leftPanelId = findLeftPanel(orca.state.panels, panelId)
+      
+      if (leftPanelId) {
+        // 左侧已有面板，直接在左侧面板打开卡片
+        orca.nav.goTo("block", { blockId: cardBlockId }, leftPanelId)
+        orca.nav.switchFocusTo(leftPanelId)
+        orca.notify("info", "已在左侧面板打开卡片", { title: "SRS 复习" })
       } else {
-        orca.nav.goTo("block", { blockId: cardBlockId })
-        orca.notify("info", "已在当前面板打开卡片", { title: "SRS 复习" })
+        // 左侧没有面板，在左侧创建新面板
+        leftPanelId = orca.nav.addTo(panelId, "left", {
+          view: "block",
+          viewArgs: { blockId: cardBlockId },
+          viewState: {}
+        })
+        
+        if (leftPanelId) {
+          // 调整面板大小为 50/50
+          schedulePanelResize(leftPanelId, currentPluginName)
+          orca.nav.switchFocusTo(leftPanelId)
+          orca.notify("info", "已在新面板打开卡片", { title: "SRS 复习" })
+        } else {
+          // 创建失败，回退到当前面板打开（会覆盖复习界面）
+          orca.nav.goTo("block", { blockId: cardBlockId })
+          orca.notify("warn", "无法创建左侧面板，已在当前面板打开卡片", { title: "SRS 复习" })
+        }
       }
     } catch (error) {
       console.error("[SRS Review Session Renderer] 跳转到卡片失败:", error)
