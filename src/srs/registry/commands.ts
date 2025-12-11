@@ -9,6 +9,8 @@ import { BlockWithRepr } from "../blockUtils"
 import { scanCardsFromTags, makeCardFromBlock } from "../cardCreator"
 import { createCloze } from "../clozeUtils"
 import { insertDirection } from "../directionUtils"
+import { makeAICardFromBlock } from "../ai/aiCardCreator"
+import { testAIConnection } from "../ai/aiService"
 
 export function registerCommands(
   pluginName: string,
@@ -200,6 +202,59 @@ export function registerCommands(
       hasArgs: false
     }
   )
+
+  // ============ AI 卡片命令 ============
+
+  // AI 生成卡片命令
+  orca.commands.registerEditorCommand(
+    `${pluginName}.makeAICard`,
+    async (editor, ...args) => {
+      const [panelId, rootBlockId, cursor] = editor
+      if (!cursor) {
+        orca.notify("error", "无法获取光标位置")
+        return null
+      }
+      const result = await makeAICardFromBlock(cursor, _pluginName)
+      return result ? { ret: result, undoArgs: result } : null
+    },
+    async undoArgs => {
+      // 撤销：删除创建的子块（答案孙子块会一起被删除）
+      if (!undoArgs || !undoArgs.blockId) return
+
+      try {
+        await orca.commands.invokeEditorCommand(
+          "core.editor.deleteBlocks",
+          null,
+          [undoArgs.blockId]
+        )
+        console.log(`[${_pluginName}] 已撤销 AI 卡片：删除块 #${undoArgs.blockId}`)
+      } catch (error) {
+        console.error(`[${_pluginName}] 撤销 AI 卡片失败:`, error)
+      }
+    },
+    {
+      label: "SRS: AI 生成记忆卡片",
+      hasArgs: false
+    }
+  )
+
+  // AI 连接测试命令
+  orca.commands.registerCommand(
+    `${pluginName}.testAIConnection`,
+    async () => {
+      console.log(`[${_pluginName}] 测试 AI 连接`)
+      orca.notify("info", "正在测试 AI 连接...", { title: "AI 连接测试" })
+      
+      const result = await testAIConnection(_pluginName)
+      
+      if (result.success) {
+        orca.notify("success", result.message, { title: "AI 连接测试" })
+      } else {
+        orca.notify("error", result.message, { title: "AI 连接测试" })
+      }
+    },
+    "SRS: 测试 AI 连接"
+  )
 }
 
 export function unregisterCommands(pluginName: string): void {
@@ -210,4 +265,8 @@ export function unregisterCommands(pluginName: string): void {
   orca.commands.unregisterEditorCommand(`${pluginName}.createCloze`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createDirectionForward`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createDirectionBackward`)
+  
+  // AI 命令注销
+  orca.commands.unregisterEditorCommand(`${pluginName}.makeAICard`)
+  orca.commands.unregisterCommand(`${pluginName}.testAIConnection`)
 }

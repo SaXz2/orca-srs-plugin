@@ -18,6 +18,7 @@ import { registerCommands, unregisterCommands } from "./srs/registry/commands"
 import { registerUIComponents, unregisterUIComponents } from "./srs/registry/uiComponents"
 import { registerRenderers, unregisterRenderers } from "./srs/registry/renderers"
 import { registerConverters, unregisterConverters } from "./srs/registry/converters"
+import { aiSettingsSchema } from "./srs/ai/aiSettingsSchema"
 
 // 插件全局状态
 let pluginName: string
@@ -33,6 +34,14 @@ export async function load(_name: string) {
 
   // 设置国际化
   setupL10N(orca.state.locale, { "zh-CN": zhCN })
+
+  // 注册 AI 设置
+  try {
+    await orca.plugins.setSettingsSchema(pluginName, aiSettingsSchema)
+    console.log(`[${pluginName}] AI 设置已注册`)
+  } catch (error) {
+    console.warn(`[${pluginName}] 注册 AI 设置失败:`, error)
+  }
 
   console.log(`[${pluginName}] 插件已加载`)
   registerCommands(pluginName, startReviewSession, openFlashcardHome)

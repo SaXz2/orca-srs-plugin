@@ -40,6 +40,14 @@ export function registerUIComponents(pluginName: string): void {
     command: `${pluginName}.createDirectionBackward`
   })
 
+  // ============ AI 卡片工具栏按钮 ============
+
+  orca.toolbar.registerToolbarButton(`${pluginName}.aiCardButton`, {
+    icon: "ti ti-robot",
+    tooltip: "AI 生成记忆卡片",
+    command: `${pluginName}.makeAICard`
+  })
+
   // ============ 斜杠命令 ============
   
   orca.slashCommands.registerSlashCommand(`${pluginName}.makeCard`, {
@@ -62,6 +70,15 @@ export function registerUIComponents(pluginName: string): void {
     title: "创建反向方向卡 ← (光标位置分隔问答)",
     command: `${pluginName}.createDirectionBackward`
   })
+
+  // ============ AI 卡片斜杠命令 ============
+
+  orca.slashCommands.registerSlashCommand(`${pluginName}.aiCard`, {
+    icon: "ti ti-robot",
+    group: "SRS",
+    title: "AI 生成记忆卡片",
+    command: `${pluginName}.makeAICard`
+  })
 }
 
 export function unregisterUIComponents(pluginName: string): void {
@@ -71,9 +88,11 @@ export function unregisterUIComponents(pluginName: string): void {
   orca.toolbar.unregisterToolbarButton(`${pluginName}.clozeButton`)
   orca.toolbar.unregisterToolbarButton(`${pluginName}.directionForwardButton`)
   orca.toolbar.unregisterToolbarButton(`${pluginName}.directionBackwardButton`)
+  orca.toolbar.unregisterToolbarButton(`${pluginName}.aiCardButton`)
   
   // 斜杠命令
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.makeCard`)
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.directionForward`)
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.directionBackward`)
+  orca.slashCommands.unregisterSlashCommand(`${pluginName}.aiCard`)
 }
