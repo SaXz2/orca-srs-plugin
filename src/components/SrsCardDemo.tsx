@@ -4,9 +4,10 @@
  * 题目与答案区域直接嵌入 Orca Block，用户可以像在正文中一样编辑，
  * 不再需要单独的 textarea 与保存逻辑。
  *
- * 支持两种卡片类型：
+ * 支持三种卡片类型：
  * - basic 卡片（srs.card）：正面/反面模式
  * - cloze 卡片（srs.cloze-card）：填空模式
+ * - direction 卡片（srs.direction-card）：方向模式
  */
 
 // 从全局 window 对象获取 React 与 Valtio（Orca 插件约定）
@@ -17,6 +18,7 @@ const { Block, Button, ModalOverlay } = orca.components
 import type { DbId } from "../orca.d.ts"
 import type { Grade, SrsState } from "../srs/types"
 import ClozeCardReviewRenderer from "./ClozeCardReviewRenderer"
+import DirectionCardReviewRenderer from "./DirectionCardReviewRenderer"
 import { extractCardType } from "../srs/deckUtils"
 import SrsErrorBoundary from "./SrsErrorBoundary"
 import { useReviewShortcuts } from "../hooks/useReviewShortcuts"
@@ -144,6 +146,7 @@ type SrsCardDemoProps = {
   panelId?: string
   pluginName?: string
   clozeNumber?: number  // 填空卡片的填空编号
+  directionType?: "forward" | "backward"  // 方向卡片的复习方向
 }
 
 export default function SrsCardDemo({
@@ -158,7 +161,8 @@ export default function SrsCardDemo({
   inSidePanel = false,
   panelId,
   pluginName = "orca-srs",
-  clozeNumber
+  clozeNumber,
+  directionType
 }: SrsCardDemoProps) {
   const [showAnswer, setShowAnswer] = useState(false)
 
@@ -178,7 +182,12 @@ export default function SrsCardDemo({
     }
   }, [snapshot?.blocks, blockId])
 
-  const reprType = inferredCardType === "cloze" ? "srs.cloze-card" : "srs.card"
+  // 确定 reprType
+  const reprType = inferredCardType === "cloze" 
+    ? "srs.cloze-card" 
+    : inferredCardType === "direction"
+    ? "srs.direction-card"
+    : "srs.card"
 
   // 如果是 cloze 卡片，使用专门的 Cloze 渲染器
   if (reprType === "srs.cloze-card" && blockId) {
@@ -195,6 +204,26 @@ export default function SrsCardDemo({
           panelId={panelId}
           pluginName={pluginName}
           clozeNumber={clozeNumber}  // 传递填空编号
+        />
+      </SrsErrorBoundary>
+    )
+  }
+
+  // 如果是 direction 卡片，使用专门的 Direction 渲染器
+  if (reprType === "srs.direction-card" && blockId && directionType) {
+    return (
+      <SrsErrorBoundary componentName="方向卡片" errorTitle="方向卡片加载出错">
+        <DirectionCardReviewRenderer
+          blockId={blockId}
+          onGrade={onGrade}
+          onClose={onClose}
+          srsInfo={srsInfo}
+          isGrading={isGrading}
+          onJumpToCard={onJumpToCard}
+          inSidePanel={inSidePanel}
+          panelId={panelId}
+          pluginName={pluginName}
+          reviewDirection={directionType}  // 传递复习方向
         />
       </SrsErrorBoundary>
     )

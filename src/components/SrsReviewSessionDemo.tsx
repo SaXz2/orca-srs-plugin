@@ -3,7 +3,7 @@
  */
 import type { DbId } from "../orca.d.ts"
 import type { Grade, ReviewCard } from "../srs/types"
-import { updateSrsState, updateClozeSrsState } from "../srs/storage"
+import { updateSrsState, updateClozeSrsState, updateDirectionSrsState } from "../srs/storage"
 import SrsCardDemo from "./SrsCardDemo"
 
 // 从全局 window 对象获取 React（Orca 插件约定）
@@ -121,18 +121,33 @@ export default function SrsReviewSession({
     setIsGrading(true)
 
     // 根据卡片类型选择不同的更新函数
-    const result = currentCard.clozeNumber
-      ? await updateClozeSrsState(currentCard.id, currentCard.clozeNumber, grade)
-      : await updateSrsState(currentCard.id, grade)
+    let result
+    if (currentCard.clozeNumber) {
+      // Cloze 卡片
+      result = await updateClozeSrsState(currentCard.id, currentCard.clozeNumber, grade)
+    } else if (currentCard.directionType) {
+      // Direction 卡片
+      result = await updateDirectionSrsState(currentCard.id, currentCard.directionType, grade)
+    } else {
+      // Basic 卡片
+      result = await updateSrsState(currentCard.id, grade)
+    }
 
     const updatedCard: ReviewCard = { ...currentCard, srs: result.state, isNew: false }
     const nextQueue = [...queue]
     nextQueue[currentIndex] = updatedCard
     setQueue(nextQueue)
 
-    const clozeLabel = currentCard.clozeNumber ? ` [c${currentCard.clozeNumber}]` : ""
+    // 构建日志标签
+    let cardLabel = ""
+    if (currentCard.clozeNumber) {
+      cardLabel = ` [c${currentCard.clozeNumber}]`
+    } else if (currentCard.directionType) {
+      cardLabel = ` [${currentCard.directionType === "forward" ? "→" : "←"}]`
+    }
+
     setLastLog(
-      `评分 ${grade.toUpperCase()}${clozeLabel} -> 下次 ${formatSimpleDate(result.state.due)}，间隔 ${result.state.interval} 天`
+      `评分 ${grade.toUpperCase()}${cardLabel} -> 下次 ${formatSimpleDate(result.state.due)}，间隔 ${result.state.interval} 天`
     )
 
     setReviewedCount((prev: number) => prev + 1)
@@ -367,6 +382,7 @@ export default function SrsReviewSession({
             panelId={panelId}
             pluginName={pluginName}
             clozeNumber={currentCard.clozeNumber}
+            directionType={currentCard.directionType}
           />
         </div>
       </div>
@@ -442,6 +458,7 @@ export default function SrsReviewSession({
         panelId={panelId}
         pluginName={pluginName}
         clozeNumber={currentCard.clozeNumber}
+        directionType={currentCard.directionType}
       />
     </div>
   )

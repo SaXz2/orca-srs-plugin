@@ -2,9 +2,10 @@
  * SRS 数据存储模块
  *
  * 负责 SRS 卡片状态的读取和保存
- * 支持两种卡片类型：
+ * 支持三种卡片类型：
  * - 普通卡片：属性前缀为 "srs."
  * - Cloze 卡片：属性前缀为 "srs.cN."（N 为填空编号）
+ * - Direction 卡片：属性前缀为 "srs.forward." 或 "srs.backward."
  */
 
 import type { Block, DbId } from "../orca.d.ts"
@@ -23,6 +24,17 @@ import type { Grade, SrsState } from "./types"
  */
 const buildPropertyName = (base: string, clozeNumber?: number): string =>
   clozeNumber !== undefined ? `srs.c${clozeNumber}.${base}` : `srs.${base}`
+
+/**
+ * 构建方向卡属性名称
+ * @param base - 基础属性名（如 "stability", "due" 等）
+ * @param directionType - 方向类型（"forward" 或 "backward"）
+ * @returns 完整的属性名
+ */
+const buildDirectionPropertyName = (
+  base: string,
+  directionType: "forward" | "backward"
+): string => `srs.${directionType}.${base}`
 
 /**
  * 从块属性中读取指定名称的值
@@ -235,5 +247,117 @@ export const updateClozeSrsState = async (
   const prev = await loadClozeSrsState(blockId, clozeNumber)
   const result = nextReviewState(prev, grade)
   await saveClozeSrsState(blockId, clozeNumber, result.state)
+  return result
+}
+
+// ============================================================================
+// Direction 卡片 API
+// ============================================================================
+
+/**
+ * 加载方向卡某个方向的 SRS 状态
+ *
+ * 属性命名：srs.forward.due, srs.backward.stability 等
+ *
+ * @param blockId - 块 ID
+ * @param directionType - 方向类型（"forward" 或 "backward"）
+ * @returns SRS 状态
+ */
+export const loadDirectionSrsState = async (
+  blockId: DbId,
+  directionType: "forward" | "backward"
+): Promise<SrsState> => {
+  const now = new Date()
+  const initial = createInitialSrsState(now)
+  const block = (await orca.invokeBackend("get-block", blockId)) as Block | undefined
+
+  if (!block) {
+    return initial
+  }
+
+  const getPropValue = (base: string) =>
+    readProp(block, buildDirectionPropertyName(base, directionType))
+
+  return {
+    stability: parseNumber(getPropValue("stability"), initial.stability),
+    difficulty: parseNumber(getPropValue("difficulty"), initial.difficulty),
+    interval: parseNumber(getPropValue("interval"), initial.interval),
+    due: parseDate(getPropValue("due"), initial.due) ?? initial.due,
+    lastReviewed: parseDate(getPropValue("lastReviewed"), initial.lastReviewed),
+    reps: parseNumber(getPropValue("reps"), initial.reps),
+    lapses: parseNumber(getPropValue("lapses"), initial.lapses),
+    state: initial.state
+  }
+}
+
+/**
+ * 保存方向卡某个方向的 SRS 状态
+ *
+ * @param blockId - 块 ID
+ * @param directionType - 方向类型
+ * @param newState - 新的 SRS 状态
+ */
+export const saveDirectionSrsState = async (
+  blockId: DbId,
+  directionType: "forward" | "backward",
+  newState: SrsState
+): Promise<void> => {
+  const properties = [
+    { name: buildDirectionPropertyName("stability", directionType), value: newState.stability, type: 3 },
+    { name: buildDirectionPropertyName("difficulty", directionType), value: newState.difficulty, type: 3 },
+    { name: buildDirectionPropertyName("interval", directionType), value: newState.interval, type: 3 },
+    { name: buildDirectionPropertyName("due", directionType), value: newState.due, type: 5 },
+    { name: buildDirectionPropertyName("lastReviewed", directionType), value: newState.lastReviewed ?? null, type: 5 },
+    { name: buildDirectionPropertyName("reps", directionType), value: newState.reps, type: 3 },
+    { name: buildDirectionPropertyName("lapses", directionType), value: newState.lapses, type: 3 }
+  ]
+
+  await orca.commands.invokeEditorCommand(
+    "core.editor.setProperties",
+    null,
+    [blockId],
+    properties
+  )
+}
+
+/**
+ * 为方向卡写入初始 SRS 状态
+ *
+ * @param blockId - 块 ID
+ * @param directionType - 方向类型
+ * @param daysOffset - 距离今天的天数偏移（forward=0, backward=1）
+ * @returns 初始 SRS 状态
+ */
+export const writeInitialDirectionSrsState = async (
+  blockId: DbId,
+  directionType: "forward" | "backward",
+  daysOffset: number = 0
+): Promise<SrsState> => {
+  const now = new Date()
+  const dueDate = new Date(now)
+  dueDate.setDate(dueDate.getDate() + daysOffset)
+  dueDate.setHours(0, 0, 0, 0)
+
+  const initial = createInitialSrsState(dueDate)
+  await saveDirectionSrsState(blockId, directionType, initial)
+  return initial
+}
+
+/**
+ * 更新方向卡某个方向的 SRS 状态
+ *
+ * @param blockId - 块 ID
+ * @param directionType - 方向类型
+ * @param grade - 评分
+ * @returns { state, log }
+ */
+export const updateDirectionSrsState = async (
+  blockId: DbId,
+  directionType: "forward" | "backward",
+  grade: Grade
+) => {
+  const prev = await loadDirectionSrsState(blockId, directionType)
+  const result = nextReviewState(prev, grade)
+  await saveDirectionSrsState(blockId, directionType, result.state)
   return result
 }

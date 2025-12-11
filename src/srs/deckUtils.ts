@@ -8,6 +8,14 @@ import type { Block } from "../orca.d.ts"
 import type { ReviewCard, DeckInfo, DeckStats } from "./types"
 
 /**
+ * 卡片类型
+ * - basic: 基本卡（正面/反面）
+ * - cloze: 填空卡
+ * - direction: 方向卡
+ */
+export type CardType = "basic" | "cloze" | "direction"
+
+/**
  * 从块的标签属性系统中提取卡片类型
  *
  * 工作原理：
@@ -17,14 +25,14 @@ import type { ReviewCard, DeckInfo, DeckStats } from "./types"
  *
  * 用户操作流程：
  * 1. 在 Orca 标签页面为 #card 标签定义属性 "type"（类型：单选/多选文本）
- * 2. 添加可选值（如 "basic", "cloze"）
+ * 2. 添加可选值（如 "basic", "cloze", "direction"）
  * 3. 给块打 #card 标签后，从下拉菜单选择 type 值
- * 4. 或者使用 cloze 按钮时自动设置为 "cloze"
+ * 4. 或者使用 cloze/direction 按钮时自动设置对应类型
  *
  * @param block - 块对象
- * @returns 卡片类型，"basic" 或 "cloze"，默认为 "basic"
+ * @returns 卡片类型，"basic"、"cloze" 或 "direction"，默认为 "basic"
  */
-export function extractCardType(block: Block): "basic" | "cloze" {
+export function extractCardType(block: Block): CardType {
   // 边界情况：块没有引用
   if (!block.refs || block.refs.length === 0) {
     return "basic"
@@ -64,11 +72,15 @@ export function extractCardType(block: Block): "basic" | "cloze" {
       return "basic"
     }
     const firstValue = typeValue[0].trim().toLowerCase()
-    return firstValue === "cloze" ? "cloze" : "basic"
+    if (firstValue === "cloze") return "cloze"
+    if (firstValue === "direction") return "direction"
+    return "basic"
   } else if (typeof typeValue === "string") {
     // 单选类型：直接使用字符串
     const trimmedValue = typeValue.trim().toLowerCase()
-    return trimmedValue === "cloze" ? "cloze" : "basic"
+    if (trimmedValue === "cloze") return "cloze"
+    if (trimmedValue === "direction") return "direction"
+    return "basic"
   }
 
   // 其他类型：默认为 basic

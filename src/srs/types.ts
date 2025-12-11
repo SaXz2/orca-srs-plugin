@@ -22,6 +22,7 @@ export type ReviewCard = {
   isNew: boolean
   deck: string  // 修改：从 deck?: string 改为必填
   clozeNumber?: number  // 填空编号（仅 cloze 卡片使用）
+  directionType?: "forward" | "backward"  // 方向类型（仅 direction 卡片使用）
 }
 
 // Deck 统计信息

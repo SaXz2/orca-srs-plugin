@@ -8,6 +8,7 @@ import type { Block } from "../../orca.d.ts"
 import { BlockWithRepr } from "../blockUtils"
 import { scanCardsFromTags, makeCardFromBlock } from "../cardCreator"
 import { createCloze } from "../clozeUtils"
+import { insertDirection } from "../directionUtils"
 
 export function registerCommands(
   pluginName: string,
@@ -123,6 +124,82 @@ export function registerCommands(
       hasArgs: false
     }
   )
+
+  // 方向卡命令：正向 (Ctrl+Alt+.)
+  orca.commands.registerEditorCommand(
+    `${pluginName}.createDirectionForward`,
+    async (editor, ...args) => {
+      const [panelId, rootBlockId, cursor] = editor
+      if (!cursor) {
+        orca.notify("error", "无法获取光标位置")
+        return null
+      }
+      const result = await insertDirection(cursor, "forward", _pluginName)
+      return result ? { ret: result, undoArgs: result } : null
+    },
+    async undoArgs => {
+      if (!undoArgs || !undoArgs.blockId) return
+
+      const block = orca.state.blocks[undoArgs.blockId] as Block
+      if (!block) return
+
+      if (undoArgs.originalContent) {
+        await orca.commands.invokeEditorCommand(
+          "core.editor.setBlocksContent",
+          null,
+          [
+            {
+              id: undoArgs.blockId,
+              content: undoArgs.originalContent
+            }
+          ],
+          false
+        )
+      }
+    },
+    {
+      label: "SRS: 创建正向方向卡 →",
+      hasArgs: false
+    }
+  )
+
+  // 方向卡命令：反向 (Ctrl+Alt+,)
+  orca.commands.registerEditorCommand(
+    `${pluginName}.createDirectionBackward`,
+    async (editor, ...args) => {
+      const [panelId, rootBlockId, cursor] = editor
+      if (!cursor) {
+        orca.notify("error", "无法获取光标位置")
+        return null
+      }
+      const result = await insertDirection(cursor, "backward", _pluginName)
+      return result ? { ret: result, undoArgs: result } : null
+    },
+    async undoArgs => {
+      if (!undoArgs || !undoArgs.blockId) return
+
+      const block = orca.state.blocks[undoArgs.blockId] as Block
+      if (!block) return
+
+      if (undoArgs.originalContent) {
+        await orca.commands.invokeEditorCommand(
+          "core.editor.setBlocksContent",
+          null,
+          [
+            {
+              id: undoArgs.blockId,
+              content: undoArgs.originalContent
+            }
+          ],
+          false
+        )
+      }
+    },
+    {
+      label: "SRS: 创建反向方向卡 ←",
+      hasArgs: false
+    }
+  )
 }
 
 export function unregisterCommands(pluginName: string): void {
@@ -131,4 +208,6 @@ export function unregisterCommands(pluginName: string): void {
   orca.commands.unregisterCommand(`${pluginName}.openFlashcardHome`)
   orca.commands.unregisterEditorCommand(`${pluginName}.makeCardFromBlock`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createCloze`)
+  orca.commands.unregisterEditorCommand(`${pluginName}.createDirectionForward`)
+  orca.commands.unregisterEditorCommand(`${pluginName}.createDirectionBackward`)
 }

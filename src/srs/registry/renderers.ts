@@ -7,9 +7,11 @@
 import SrsReviewSessionRenderer from "../../components/SrsReviewSessionRenderer"
 import SrsCardBlockRenderer from "../../components/SrsCardBlockRenderer"
 import ClozeInlineRenderer from "../../components/ClozeInlineRenderer"
+import DirectionInlineRenderer from "../../components/DirectionInlineRenderer"
 import SrsFlashcardHomeRenderer from "../../components/SrsFlashcardHomeRenderer"
 
 export function registerRenderers(pluginName: string): void {
+  // 基本卡块渲染器
   orca.renderers.registerBlock(
     "srs.card",
     false,
@@ -18,6 +20,7 @@ export function registerRenderers(pluginName: string): void {
     false
   )
 
+  // Cloze 卡块渲染器
   orca.renderers.registerBlock(
     "srs.cloze-card",
     false,
@@ -26,6 +29,16 @@ export function registerRenderers(pluginName: string): void {
     false
   )
 
+  // Direction 卡块渲染器（复用 SrsCardBlockRenderer，内部路由到具体渲染器）
+  orca.renderers.registerBlock(
+    "srs.direction-card",
+    false,
+    SrsCardBlockRenderer,
+    [],
+    false
+  )
+
+  // 复习会话渲染器
   orca.renderers.registerBlock(
     "srs.review-session",
     false,
@@ -34,6 +47,7 @@ export function registerRenderers(pluginName: string): void {
     false
   )
 
+  // Flashcard Home 渲染器
   orca.renderers.registerBlock(
     "srs.flashcard-home",
     false,
@@ -42,17 +56,27 @@ export function registerRenderers(pluginName: string): void {
     false
   )
 
+  // Cloze inline 渲染器
   orca.renderers.registerInline(
     `${pluginName}.cloze`,
     false,
     ClozeInlineRenderer
+  )
+
+  // Direction inline 渲染器
+  orca.renderers.registerInline(
+    `${pluginName}.direction`,
+    false,
+    DirectionInlineRenderer
   )
 }
 
 export function unregisterRenderers(pluginName: string): void {
   orca.renderers.unregisterBlock("srs.card")
   orca.renderers.unregisterBlock("srs.cloze-card")
+  orca.renderers.unregisterBlock("srs.direction-card")
   orca.renderers.unregisterBlock("srs.review-session")
   orca.renderers.unregisterBlock("srs.flashcard-home")
   orca.renderers.unregisterInline(`${pluginName}.cloze`)
+  orca.renderers.unregisterInline(`${pluginName}.direction`)
 }

@@ -11,6 +11,7 @@ import type {
 } from "../../orca.d.ts"
 
 export function registerConverters(pluginName: string): void {
+  // 基本卡转换器
   orca.converters.registerBlock(
     "plain",
     "srs.card",
@@ -21,6 +22,7 @@ export function registerConverters(pluginName: string): void {
     }
   )
 
+  // Cloze 卡转换器
   orca.converters.registerBlock(
     "plain",
     "srs.cloze-card",
@@ -31,18 +33,34 @@ export function registerConverters(pluginName: string): void {
     }
   )
 
+  // Direction 卡转换器
+  orca.converters.registerBlock(
+    "plain",
+    "srs.direction-card",
+    (blockContent: BlockForConversion, repr: Repr) => {
+      const front = repr.front || "（左侧）"
+      const back = repr.back || "（右侧）"
+      const direction = repr.direction || "forward"
+      const arrow = direction === "forward" ? "->" : direction === "backward" ? "<-" : "<->"
+      return `[SRS 方向卡片]\n${front} ${arrow} ${back}`
+    }
+  )
+
+  // 复习会话转换器
   orca.converters.registerBlock(
     "plain",
     "srs.review-session",
     () => "[SRS 复习会话面板块]"
   )
 
+  // Flashcard Home 转换器
   orca.converters.registerBlock(
     "plain",
     "srs.flashcard-home",
     () => "[SRS Flashcard Home 面板块]"
   )
 
+  // Cloze inline 转换器
   orca.converters.registerInline(
     "plain",
     `${pluginName}.cloze`,
@@ -52,12 +70,25 @@ export function registerConverters(pluginName: string): void {
       return `{c${clozeNumber}:: ${content}}`
     }
   )
+
+  // Direction inline 转换器
+  orca.converters.registerInline(
+    "plain",
+    `${pluginName}.direction`,
+    (fragment: ContentFragment) => {
+      const direction = (fragment as any).direction || "forward"
+      const symbol = direction === "forward" ? "->" : direction === "backward" ? "<-" : "<->"
+      return ` ${symbol} `
+    }
+  )
 }
 
 export function unregisterConverters(pluginName: string): void {
   orca.converters.unregisterBlock("plain", "srs.card")
   orca.converters.unregisterBlock("plain", "srs.cloze-card")
+  orca.converters.unregisterBlock("plain", "srs.direction-card")
   orca.converters.unregisterBlock("plain", "srs.review-session")
   orca.converters.unregisterBlock("plain", "srs.flashcard-home")
   orca.converters.unregisterInline("plain", `${pluginName}.cloze`)
+  orca.converters.unregisterInline("plain", `${pluginName}.direction`)
 }

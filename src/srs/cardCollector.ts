@@ -8,8 +8,16 @@ import type { Block, DbId } from "../orca.d.ts"
 import type { ReviewCard } from "./types"
 import { BlockWithRepr, isSrsCardBlock, resolveFrontBack } from "./blockUtils"
 import { extractDeckName, extractCardType } from "./deckUtils"
-import { loadCardSrsState, writeInitialSrsState, loadClozeSrsState, writeInitialClozeSrsState } from "./storage"
+import { 
+  loadCardSrsState, 
+  writeInitialSrsState, 
+  loadClozeSrsState, 
+  writeInitialClozeSrsState,
+  loadDirectionSrsState,
+  writeInitialDirectionSrsState
+} from "./storage"
 import { getAllClozeNumbers } from "./clozeUtils"
+import { extractDirectionInfo, getDirectionList } from "./directionUtils"
 
 /**
  * 收集所有 SRS 块（带 #card 标签或 _repr.type="srs.card" 的块）
@@ -74,8 +82,8 @@ export async function collectSrsBlocks(pluginName: string = "srs-plugin"): Promi
     .filter((b): b is BlockWithRepr => {
       if (!b) return false
       const reprType = (b as BlockWithRepr)._repr?.type
-      // 支持两种卡片类型：basic 和 cloze
-      return reprType === "srs.card" || reprType === "srs.cloze-card"
+      // 支持三种卡片类型：basic、cloze 和 direction
+      return reprType === "srs.card" || reprType === "srs.cloze-card" || reprType === "srs.direction-card"
     })
 
   const merged = new Map<DbId, BlockWithRepr>()
@@ -90,6 +98,7 @@ export async function collectSrsBlocks(pluginName: string = "srs-plugin"): Promi
  * 收集所有待复习的卡片
  *
  * 对于 Cloze 卡片，为每个填空编号生成独立的 ReviewCard
+ * 对于 Direction 卡片，根据方向类型生成一张或两张 ReviewCard
  *
  * @param pluginName - 插件名称（用于日志），可选
  * @returns ReviewCard 数组
@@ -137,6 +146,44 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
           clozeNumber // 关键：标记当前复习的填空编号
         })
       }
+    } else if (cardType === "direction") {
+      // Direction 卡片：根据方向类型生成一张或两张卡片
+      const dirInfo = extractDirectionInfo(block.content, pluginName)
+      
+      if (!dirInfo) {
+        console.log(`[${pluginName}] collectReviewCards: 块 ${block.id} 无法解析方向卡内容`)
+        continue
+      }
+
+      // 获取需要生成卡片的方向列表
+      const directions = getDirectionList(dirInfo.direction)
+
+      for (let i = 0; i < directions.length; i++) {
+        const dir = directions[i]
+
+        // 检查是否已有该方向的 SRS 属性
+        const hasDirectionSrsProps = block.properties?.some(prop =>
+          prop.name.startsWith(`srs.${dir}.`)
+        )
+
+        const srsState = hasDirectionSrsProps
+          ? await loadDirectionSrsState(block.id, dir)
+          : await writeInitialDirectionSrsState(block.id, dir, i) // 分天推送
+
+        // 根据方向决定问题和答案
+        const front = dir === "forward" ? dirInfo.leftText : dirInfo.rightText
+        const back = dir === "forward" ? dirInfo.rightText : dirInfo.leftText
+
+        cards.push({
+          id: block.id,
+          front,
+          back,
+          srs: srsState,
+          isNew: !srsState.lastReviewed || srsState.reps === 0,
+          deck: deckName,
+          directionType: dir // 关键：标记当前复习的方向类型
+        })
+      }
     } else {
       // Basic 卡片：传统的正面/反面模式
       const { front, back } = resolveFrontBack(block)
@@ -152,7 +199,7 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
         srs: srsState,
         isNew: !srsState.lastReviewed || srsState.reps === 0,
         deck: deckName
-        // clozeNumber 为 undefined（非 cloze 卡片）
+        // clozeNumber 和 directionType 都为 undefined（非特殊卡片）
       })
     }
   }
@@ -168,7 +215,7 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
  * - 只比较日期，忽略具体的时分秒
  * - 只要卡片的到期日期 <= 今天，就视为到期
  * - 新卡也要检查到期时间：只有到期日期 <= 今天的新卡才会出现在队列中
- * - 这样可以实现 cloze 卡片的分天推送：c1 今天，c2 明天，c3 后天...
+ * - 这样可以实现 cloze/direction 卡片的分天推送
  *
  * @param cards - ReviewCard 数组
  * @returns 排序后的复习队列
