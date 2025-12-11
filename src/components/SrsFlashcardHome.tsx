@@ -66,6 +66,15 @@ export default function SrsFlashcardHome({ panelId, blockId }: SrsFlashcardHomeP
       const style = document.createElement('style')
       style.id = styleId
       style.textContent = `
+        /* 隐藏 Orca 的非可编辑遮罩层，避免阻止按钮交互 */
+        .orca-block[data-type="srs.flashcard-home"] .orca-repr-main-none-editable {
+          display: none !important;
+          pointer-events: none !important;
+        }
+        /* 确保 FlashcardHome 内容区域可以接收点击事件 */
+        .srs-repr-flashcard-home-content {
+          pointer-events: auto !important;
+        }
         .orca-block-editor[maximize="1"] .orca-block-editor-main,
         .orca-block-editor[maximize="1"] .orca-block-editor-blocks,
         .orca-block-editor[maximize="1"] .orca-block[data-type="srs.flashcard-home"] {
