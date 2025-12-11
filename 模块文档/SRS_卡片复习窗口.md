@@ -124,9 +124,9 @@ stateDiagram-v2
 - **实现**：添加 `formatSimpleDate()` 函数
   ```typescript
   function formatSimpleDate(date: Date): string {
-    const month = date.getMonth() + 1
-    const day = date.getDate()
-    return `${month}-${day}`
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `${month}-${day}`;
   }
   ```
 - **使用场景**：
@@ -142,15 +142,35 @@ stateDiagram-v2
 - ❌ 已复习次数 / 遗忘次数
 
 **影响的组件**：
+
 - `SrsCardDemo.tsx` - Basic 卡片复习界面
 - `ClozeCardReviewRenderer.tsx` - Cloze 卡片复习界面
 - `SrsCardBlockRenderer.tsx` - 编辑器内卡片块显示
 
+### 快捷键支持（2025-12-11 更新）
+
+在复习界面支持键盘快捷键，与 Anki 保持一致：
+
+| 按键   | 操作     | 说明                 |
+| ------ | -------- | -------------------- |
+| `空格` | 显示答案 | 仅在答案未显示时有效 |
+| `1`    | Again    | 忘记                 |
+| `2`    | Hard     | 困难                 |
+| `3`    | Good     | 良好                 |
+| `4`    | Easy     | 简单                 |
+
+**实现**：通过 `useReviewShortcuts` Hook 实现，同时支持 Basic 和 Cloze 两种卡片类型。
+
+**注意事项**：
+
+- 快捷键仅在复习界面激活时生效
+- 在输入框、文本区域中不会触发快捷键
+- 评分中（isGrading=true）快捷键被禁用，防止重复触发
+
 ## 扩展点
 
-1. **快捷键支持**：可扩展键盘评分
-2. **音效反馈**：可扩展评分音效
-3. **统计图表**：可扩展显示复习统计
+1. **音效反馈**：可扩展评分音效
+2. **统计图表**：可扩展显示复习统计
 
 ## 相关文件
 
@@ -158,5 +178,7 @@ stateDiagram-v2
 | ------------------------------------------------------------------------------------------------------------------- | ------------ |
 | [SrsReviewSessionDemo.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/components/SrsReviewSessionDemo.tsx)         | 会话主组件   |
 | [SrsCardDemo.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/components/SrsCardDemo.tsx)                           | 卡片展示组件 |
+| [ClozeCardReviewRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/components/ClozeCardReviewRenderer.tsx)   | 填空卡片组件 |
+| [useReviewShortcuts.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/hooks/useReviewShortcuts.ts)                    | 快捷键 Hook  |
 | [SrsReviewSessionRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/components/SrsReviewSessionRenderer.tsx) | 块渲染器     |
 | [storage.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/storage.ts)                                            | 评分更新     |

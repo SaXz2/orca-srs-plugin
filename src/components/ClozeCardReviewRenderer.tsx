@@ -13,6 +13,7 @@ const { Button, ModalOverlay } = orca.components
 
 import type { DbId, ContentFragment } from "../orca.d.ts"
 import type { Grade, SrsState } from "../srs/types"
+import { useReviewShortcuts } from "../hooks/useReviewShortcuts"
 
 type ClozeCardReviewRendererProps = {
   blockId: DbId
@@ -135,6 +136,14 @@ export default function ClozeCardReviewRenderer({
     await onGrade(grade)
     setShowAnswer(false)
   }
+
+  // 启用复习快捷键（空格显示答案，1-4 评分）
+  useReviewShortcuts({
+    showAnswer,
+    isGrading,
+    onShowAnswer: () => setShowAnswer(true),
+    onGrade: handleGrade,
+  })
 
   // 从 block.content 中提取内容片段
   const contentFragments = useMemo(() => {

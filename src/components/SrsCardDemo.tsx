@@ -19,6 +19,7 @@ import type { Grade, SrsState } from "../srs/types"
 import ClozeCardReviewRenderer from "./ClozeCardReviewRenderer"
 import { extractCardType } from "../srs/deckUtils"
 import SrsErrorBoundary from "./SrsErrorBoundary"
+import { useReviewShortcuts } from "../hooks/useReviewShortcuts"
 
 type ReviewBlockProps = {
   blockId?: DbId
@@ -204,6 +205,14 @@ export default function SrsCardDemo({
     await onGrade(grade)
     setShowAnswer(false)
   }
+
+  // 启用复习快捷键（空格显示答案，1-4 评分）
+  useReviewShortcuts({
+    showAnswer,
+    isGrading,
+    onShowAnswer: () => setShowAnswer(true),
+    onGrade: handleGrade,
+  })
 
   const renderBlock = (renderBlockId: DbId | undefined, fallback: string, options?: { hideChildren?: boolean }) => (
     <ReviewBlock
