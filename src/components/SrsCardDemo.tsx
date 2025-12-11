@@ -266,6 +266,47 @@ export default function SrsCardDemo({
     ? "srs.direction-card"
     : "srs.card"
 
+  // 判断是否应该渲染 basic 卡片（用于控制快捷键）
+  const shouldRenderBasicCard = reprType === "srs.card" || 
+    (reprType === "srs.cloze-card" && !blockId) ||
+    (reprType === "srs.direction-card" && (!blockId || !directionType))
+
+  const handleGrade = async (grade: Grade) => {
+    if (isGrading) return
+    console.log(`[SRS Card Demo] 用户选择评分: ${grade}`)
+    await onGrade(grade)
+    setShowAnswer(false)
+  }
+
+  // 【修复 React Hooks 规则】将 useReviewShortcuts 移到条件返回之前
+  // 只有渲染 basic 卡片时才启用快捷键（cloze/direction 组件有自己的快捷键处理）
+  useReviewShortcuts({
+    showAnswer,
+    isGrading,
+    onShowAnswer: () => setShowAnswer(true),
+    onGrade: handleGrade,
+    onBury,
+    onSuspend,
+    enabled: shouldRenderBasicCard,  // 仅在渲染 basic 卡片时启用
+  })
+
+  // 【修复 React Hooks 规则】将 intervals 计算移到条件返回之前
+  // 预览各评分对应的间隔天数（用于按钮显示）
+  const intervals = useMemo(() => {
+    // 将 Partial<SrsState> 转换为完整的 SrsState 或 null
+    const fullState: SrsState | null = srsInfo ? {
+      stability: srsInfo.stability ?? 0,
+      difficulty: srsInfo.difficulty ?? 0,
+      interval: srsInfo.interval ?? 0,
+      due: srsInfo.due ?? new Date(),
+      lastReviewed: srsInfo.lastReviewed ?? null,
+      reps: srsInfo.reps ?? 0,
+      lapses: srsInfo.lapses ?? 0,
+      state: srsInfo.state
+    } : null
+    return previewIntervals(fullState)
+  }, [srsInfo])
+
   // 如果是 cloze 卡片，使用专门的 Cloze 渲染器
   if (reprType === "srs.cloze-card" && blockId) {
     return (
@@ -309,39 +350,6 @@ export default function SrsCardDemo({
       </SrsErrorBoundary>
     )
   }
-
-  const handleGrade = async (grade: Grade) => {
-    if (isGrading) return
-    console.log(`[SRS Card Demo] 用户选择评分: ${grade}`)
-    await onGrade(grade)
-    setShowAnswer(false)
-  }
-
-  // 启用复习快捷键（空格显示答案，1-4 评分，b 埋藏，s 暂停）
-  useReviewShortcuts({
-    showAnswer,
-    isGrading,
-    onShowAnswer: () => setShowAnswer(true),
-    onGrade: handleGrade,
-    onBury,
-    onSuspend,
-  })
-
-  // 预览各评分对应的间隔天数（用于按钮显示）
-  const intervals = useMemo(() => {
-    // 将 Partial<SrsState> 转换为完整的 SrsState 或 null
-    const fullState: SrsState | null = srsInfo ? {
-      stability: srsInfo.stability ?? 0,
-      difficulty: srsInfo.difficulty ?? 0,
-      interval: srsInfo.interval ?? 0,
-      due: srsInfo.due ?? new Date(),
-      lastReviewed: srsInfo.lastReviewed ?? null,
-      reps: srsInfo.reps ?? 0,
-      lapses: srsInfo.lapses ?? 0,
-      state: srsInfo.state
-    } : null
-    return previewIntervals(fullState)
-  }, [srsInfo])
 
   const renderBlock = (renderBlockId: DbId | undefined, fallback: string, options?: { hideChildren?: boolean }) => (
     <ReviewBlock
