@@ -13,7 +13,6 @@ import { getOrCreateReviewSessionBlock, cleanupReviewSessionBlock } from "./srs/
 import { findRightPanel, schedulePanelResize } from "./srs/panelUtils"
 import { collectReviewCards, buildReviewQueue } from "./srs/cardCollector"
 import { extractDeckName, calculateDeckStats } from "./srs/deckUtils"
-import { getOrCreateFlashcardHomeBlock, cleanupFlashcardHomeBlock } from "./srs/flashcardHomeManager"
 import { registerCommands, unregisterCommands } from "./srs/registry/commands"
 import { registerUIComponents, unregisterUIComponents } from "./srs/registry/uiComponents"
 import { registerRenderers, unregisterRenderers } from "./srs/registry/renderers"
@@ -64,7 +63,6 @@ export async function unload() {
   console.log(`[${pluginName}] 开始卸载插件`)
 
   await cleanupReviewSessionBlock(pluginName)
-  await cleanupFlashcardHomeBlock(pluginName)
 
   unregisterConverters(pluginName)
   unregisterRenderers(pluginName)
@@ -155,7 +153,6 @@ async function startReviewSession(deckName?: string, openInCurrentPanel: boolean
  */
 async function openFlashcardHome() {
   try {
-    const flashcardHomeBlockId = await getOrCreateFlashcardHomeBlock(pluginName)
     const activePanelId = orca.state.activePanel
 
     if (!activePanelId) {
@@ -163,8 +160,8 @@ async function openFlashcardHome() {
       return
     }
 
-    // 直接在当前面板中打开，而不是创建新面板
-    orca.nav.goTo("block", { blockId: flashcardHomeBlockId }, activePanelId)
+    // 使用自定义面板打开 Flashcard Home（不再创建虚拟块）
+    orca.nav.goTo("srs.flashcard-home", {}, activePanelId)
     
     orca.notify("success", "Flashcard Home 已打开", { title: "Flashcard Home" })
     console.log(`[${pluginName}] Flashcard Home opened in panel ${activePanelId}`)
