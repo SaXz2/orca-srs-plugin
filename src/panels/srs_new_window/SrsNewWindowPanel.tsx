@@ -18,6 +18,7 @@ import { previewIntervals } from "../../srs/algorithm"
 import { buryCard, suspendCard } from "../../srs/cardStatusUtils"
 import { useReviewShortcuts } from "../../hooks/useReviewShortcuts"
 import { findLeftPanel, schedulePanelResize } from "../../srs/panelUtils"
+import { attachHideableDisplayManager } from "../../srs/hideableDisplayManager"
 import { collectReviewCards, buildReviewQueue, getPluginName } from "../../main"
 import DirectionCardRenderer from "./DirectionCardRenderer"
 import BasicCardRenderer from "./BasicCardRenderer"
@@ -157,34 +158,13 @@ export default function SrsNewWindowPanel(props: PanelProps) {
   }, [])
 
   /**
-   * 隐藏同面板内的其他 hidden 视图，避免占用布局空间
-   * 这解决从 FlashcardHome 导航过来时，FlashcardHome 虽被标记hidden但仍占用空间的问题
+   * 确保同面板内 `.orca-hideable-hidden` 不占布局空间，并在恢复时还原 display
    */
   useEffect(() => {
     const rootEl = rootRef.current
     if (!rootEl) return
 
-    const panelEl = rootEl.closest(".orca-panel") as HTMLElement | null
-    if (!panelEl) return
-
-    const restored: Array<() => void> = []
-
-    // 查找同一面板内所有 hidden 的视图元素
-    const hiddenViews = Array.from(
-      panelEl.querySelectorAll<HTMLElement>(".orca-hideable.orca-hideable-hidden")
-    )
-
-    for (const hidden of hiddenViews) {
-      const prevDisplay = hidden.style.display
-      hidden.style.display = "none"
-      restored.push(() => {
-        hidden.style.display = prevDisplay
-      })
-    }
-
-    return () => {
-      for (const restore of restored) restore()
-    }
+    return attachHideableDisplayManager(rootEl)
   }, [])
 
   /**

@@ -1,6 +1,7 @@
 import type { PanelProps } from "../orca.d.ts"
 import SrsFlashcardHome from "../components/SrsFlashcardHome"
 import SrsErrorBoundary from "../components/SrsErrorBoundary"
+import { attachHideableDisplayManager } from "../srs/hideableDisplayManager"
 
 export default function SrsFlashcardHomePanel(props: PanelProps) {
   const { panelId } = props
@@ -11,10 +12,11 @@ export default function SrsFlashcardHomePanel(props: PanelProps) {
     const rootEl = rootRef.current
     if (!rootEl) return
 
-    const panelEl = rootEl.closest(".orca-panel") as HTMLElement | null
     const hideableEl = rootEl.closest(".orca-hideable") as HTMLElement | null
 
     const restored: Array<() => void> = []
+
+    restored.push(attachHideableDisplayManager(rootEl))
 
     if (hideableEl) {
       const prevFlex = hideableEl.style.flex
@@ -28,20 +30,6 @@ export default function SrsFlashcardHomePanel(props: PanelProps) {
         hideableEl.style.minWidth = prevMinWidth
         hideableEl.style.width = prevWidth
       })
-    }
-
-    if (panelEl) {
-      const hiddenViews = Array.from(
-        panelEl.querySelectorAll<HTMLElement>(".orca-hideable.orca-hideable-hidden")
-      )
-
-      for (const hidden of hiddenViews) {
-        const prevDisplay = hidden.style.display
-        hidden.style.display = "none"
-        restored.push(() => {
-          hidden.style.display = prevDisplay
-        })
-      }
     }
 
     return () => {
