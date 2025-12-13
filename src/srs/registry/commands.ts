@@ -230,6 +230,30 @@ export function registerCommands(
     },
     "SRS: 测试 AI 连接"
   )
+
+  // 测试新复习面板命令（开发阶段）
+  orca.commands.registerCommand(
+    `${pluginName}.openNewReviewPanel`,
+    async () => {
+      console.log(`[${_pluginName}] 打开新复习面板（测试）`)
+      const activePanelId = orca.state.activePanel
+      if (!activePanelId) {
+        orca.notify("warn", "当前没有可用的面板", { title: "SRS 测试" })
+        return
+      }
+      // 使用 goTo 导航到新面板
+      orca.nav.goTo(
+        "srs.new-window",
+        { 
+          deckFilter: null,
+          hostPanelId: activePanelId 
+        },
+        activePanelId
+      )
+      orca.notify("info", "已打开新复习面板（开发中）", { title: "SRS 测试" })
+    },
+    "SRS: 打开新复习面板（测试）"
+  )
 }
 
 export function unregisterCommands(pluginName: string): void {
@@ -244,4 +268,5 @@ export function unregisterCommands(pluginName: string): void {
   // AI 命令注销
   orca.commands.unregisterEditorCommand(`${pluginName}.makeAICard`)
   orca.commands.unregisterCommand(`${pluginName}.testAIConnection`)
+  orca.commands.unregisterCommand(`${pluginName}.openNewReviewPanel`)
 }

@@ -9,6 +9,7 @@ import SrsCardBlockRenderer from "../../components/SrsCardBlockRenderer"
 import ClozeInlineRenderer from "../../components/ClozeInlineRenderer"
 import DirectionInlineRenderer from "../../components/DirectionInlineRenderer"
 import SrsFlashcardHomePanel from "../../panels/SrsFlashcardHomePanel"
+import SrsNewWindowPanel from "../../panels/srs_new_window/SrsNewWindowPanel"
 
 export function registerRenderers(pluginName: string): void {
   // 基本卡块渲染器
@@ -50,6 +51,9 @@ export function registerRenderers(pluginName: string): void {
   // Flashcard Home 面板渲染器（替代旧的虚拟块渲染器）
   orca.panels.registerPanel("srs.flashcard-home", SrsFlashcardHomePanel)
 
+  // 新复习会话面板（Custom Panel 架构，迁移中）
+  orca.panels.registerPanel("srs.new-window", SrsNewWindowPanel)
+
   // Cloze inline 渲染器
   orca.renderers.registerInline(
     `${pluginName}.cloze`,
@@ -71,6 +75,7 @@ export function unregisterRenderers(pluginName: string): void {
   orca.renderers.unregisterBlock("srs.direction-card")
   orca.renderers.unregisterBlock("srs.review-session")
   orca.panels.unregisterPanel("srs.flashcard-home")
+  orca.panels.unregisterPanel("srs.new-window")
   orca.renderers.unregisterInline(`${pluginName}.cloze`)
   orca.renderers.unregisterInline(`${pluginName}.direction`)
 }
