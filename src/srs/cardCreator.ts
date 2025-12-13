@@ -99,6 +99,13 @@ export async function scanCardsFromTags(pluginName: string) {
 
       // 识别卡片类型（basic 或 cloze）
       const cardType = extractCardType(block)
+
+      // 方向卡是单行可编辑卡片（由方向标记 + 标签属性驱动），不走这里的 _repr 转换逻辑
+      if (cardType === "direction") {
+        console.log(`[${pluginName}] 跳过：块 #${block.id} 是 direction 卡片（不转换 _repr）`)
+        skippedCount++
+        continue
+      }
       const reprType = cardType === "cloze" ? "srs.cloze-card" : "srs.card"
 
       // 如果已经是对应的卡片类型，跳过

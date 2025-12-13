@@ -176,6 +176,14 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
         continue
       }
 
+      // 允许用户先插入方向符号再补全右侧文本：未完成的方向卡不进入复习队列
+      if (!dirInfo.leftText || !dirInfo.rightText) {
+        console.log(
+          `[${pluginName}] collectReviewCards: 跳过未完成的方向卡 #${block.id}（left/right 为空）`
+        )
+        continue
+      }
+
       // 获取需要生成卡片的方向列表
       const directions = getDirectionList(dirInfo.direction)
 

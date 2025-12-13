@@ -77,17 +77,12 @@ export async function insertDirection(
   const offset = cursor.anchor.offset
   const blockText = block.text || ""
 
-  // 验证左右内容不为空
+  // 验证左侧内容不为空（允许先插入符号再输入右侧答案）
   const leftPart = blockText.substring(0, offset).trim()
   const rightPart = blockText.substring(offset).trim()
 
   if (!leftPart) {
     orca.notify("warn", "方向标记左侧需要有内容")
-    return null
-  }
-
-  if (!rightPart) {
-    orca.notify("warn", "方向标记右侧需要有内容")
     return null
   }
 
@@ -143,14 +138,8 @@ export async function insertDirection(
       }
     }
 
-    // 设置 _repr
-    const finalBlock = orca.state.blocks[blockId] as BlockWithRepr
-    finalBlock._repr = {
-      type: "srs.direction-card",
-      front: leftPart,
-      back: rightPart,
-      direction: direction
-    }
+    // 注意：Direction 卡片保持为普通可编辑文本块（不设置 srs.direction-card _repr），
+    // 以支持“先插入符号，再输入右侧答案”的单行编辑体验。
 
     // 设置 srs.isCard 属性
     await orca.commands.invokeEditorCommand(
@@ -166,6 +155,31 @@ export async function insertDirection(
       await writeInitialDirectionSrsState(blockId, "backward", 1) // 明天
     } else {
       await writeInitialDirectionSrsState(blockId, direction, 0)
+    }
+
+    // 将光标移动到方向标记右侧，方便继续输入答案
+    try {
+      const nextCursor: CursorData = {
+        ...cursor,
+        isForward: true,
+        anchor: {
+          ...cursor.anchor,
+          blockId,
+          isInline: true,
+          index: 2,
+          offset: 1
+        },
+        focus: {
+          ...cursor.focus,
+          blockId,
+          isInline: true,
+          index: 2,
+          offset: 1
+        }
+      }
+      await orca.utils.setSelectionFromCursorData(nextCursor)
+    } catch (e) {
+      console.warn(`[${pluginName}] 设置光标位置失败:`, e)
     }
 
     const dirLabel =
