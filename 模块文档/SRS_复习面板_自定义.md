@@ -15,10 +15,13 @@
 
 ### 核心文件
 
-| 文件                                                                                                             | 说明               |
-| ---------------------------------------------------------------------------------------------------------------- | ------------------ |
-| [SrsNewWindowPanel.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/SrsNewWindowPanel.tsx) | 复习会话面板主组件 |
-| [refactor_plan.md](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/refactor_plan.md)           | 迁移计划和经验总结 |
+| 文件                                                                                                                     | 说明                                |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| [SrsNewWindowPanel.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/SrsNewWindowPanel.tsx)         | 复习会话面板主组件（692 行）        |
+| [BasicCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/BasicCardRenderer.tsx)         | Basic 卡片渲染器组件                |
+| [ClozeCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/ClozeCardRenderer.tsx)         | Cloze（填空）卡片渲染器组件         |
+| [DirectionCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/DirectionCardRenderer.tsx) | Direction（方向）卡片渲染器组件     |
+| [refactor_plan.md](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/refactor_plan.md)                   | 迁移计划和经验总结                  |
 
 ### 面板注册
 
@@ -61,6 +64,24 @@ flowchart TD
 - BlockShell 增加渲染层级
 
 ### 新架构（Custom Panel）
+
+```mermaid
+flowchart TD
+    A[命令/按钮触发] --> B[SrsNewWindowPanel]
+    B --> C{卡片类型?}
+    C -->|Basic| D[BasicCardRenderer]
+    C -->|Cloze| E[ClozeCardRenderer]
+    C -->|Direction| F[DirectionCardRenderer]
+```
+
+**优势**：
+
+- 无需虚拟块
+- 参数通过 `viewArgs` 直传
+- 组件拆分，职责清晰（主面板 692 行，各渲染器 260-400 行）
+- 静态导入，无动态加载开销
+
+### 组件拆分后架构
 
 ```mermaid
 flowchart TD
@@ -264,20 +285,24 @@ function renderFragments(
 - [x] 阶段 2：迁移界面框架
 - [x] 阶段 3：迁移 Basic Card
 - [x] 阶段 4：迁移 Cloze Card
+- [x] 阶段 5：迁移 Direction Card（使用独立渲染器）
 - [x] 高级功能：Bury、Suspend、快捷键
+- [x] 组件拆分：BasicCardRenderer、ClozeCardRenderer、DirectionCardRenderer
+- [x] 性能优化：动态导入改为静态导入、加载锁防止竞态条件
 
 ### 待完成
 
-- [x] 阶段 5：迁移 Direction Card（已完成，使用独立渲染器）
-- [ ] 阶段 7：清理旧代码、更新文档
+- [ ] 阶段 7：清理旧代码（可选，保留作为参考）
 
 ## 相关文件
 
-| 文件                                                                                                             | 说明              |
-| ---------------------------------------------------------------------------------------------------------------- | ----------------- |
-| [SrsNewWindowPanel.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/SrsNewWindowPanel.tsx) | 复习面板主组件    |
-| [refactor_plan.md](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/refactor_plan.md)           | 迁移计划文档      |
-| [useReviewShortcuts.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/hooks/useReviewShortcuts.ts)                 | 快捷键 Hook       |
-| [cardStatusUtils.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardStatusUtils.ts)                         | Bury/Suspend 实现 |
-| [renderers.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/registry/renderers.ts)                            | 面板注册          |
-| [commands.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/registry/commands.ts)                              | 测试命令          |
+| 文件                                                                                                                     | 说明              |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------- |
+| [SrsNewWindowPanel.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/SrsNewWindowPanel.tsx)         | 复习面板主组件    |
+| [BasicCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/BasicCardRenderer.tsx)         | Basic 卡片渲染器  |
+| [ClozeCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/ClozeCardRenderer.tsx)         | Cloze 卡片渲染器  |
+| [DirectionCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/DirectionCardRenderer.tsx) | Direction 渲染器  |
+| [refactor_plan.md](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/refactor_plan.md)                   | 迁移计划文档      |
+| [useReviewShortcuts.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/hooks/useReviewShortcuts.ts)                         | 快捷键 Hook       |
+| [cardStatusUtils.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardStatusUtils.ts)                                 | Bury/Suspend 实现 |
+| [renderers.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/registry/renderers.ts)                                    | 面板注册          |
