@@ -9,8 +9,6 @@
 
 import { setupL10N } from "./libs/l10n"
 import zhCN from "./translations/zhCN"
-import { getOrCreateReviewSessionBlock, cleanupReviewSessionBlock } from "./srs/reviewSessionManager"
-import { findRightPanel, schedulePanelResize } from "./srs/panelUtils"
 import { collectReviewCards, buildReviewQueue } from "./srs/cardCollector"
 import { extractDeckName, calculateDeckStats } from "./srs/deckUtils"
 import { registerCommands, unregisterCommands } from "./srs/registry/commands"
@@ -22,7 +20,6 @@ import { reviewSettingsSchema } from "./srs/settings/reviewSettingsSchema"
 
 // 插件全局状态
 let pluginName: string
-let reviewHostPanelId: string | null = null
 let reviewDeckFilter: string | null = null
 
 /**
@@ -52,39 +49,35 @@ export async function load(_name: string) {
   registerRenderers(pluginName)
   registerConverters(pluginName)
 
-  console.log(`[${pluginName}] 命令、UI 组件和渲染器已注册`)
+  console.log(`[${pluginName}] 命令、UI 组件、渲染器、转换器已注册`)
 }
 
 /**
  * 插件卸载函数
- * 在插件禁用时被 Orca 调用
+ * 在插件禁用或 Orca 关闭时被调用
  */
 export async function unload() {
-  console.log(`[${pluginName}] 开始卸载插件`)
-
-  await cleanupReviewSessionBlock(pluginName)
-
-  unregisterConverters(pluginName)
-  unregisterRenderers(pluginName)
-  unregisterUIComponents(pluginName)
   unregisterCommands(pluginName)
-
+  unregisterUIComponents(pluginName)
+  unregisterRenderers(pluginName)
+  unregisterConverters(pluginName)
   console.log(`[${pluginName}] 插件已卸载`)
 }
 
 // ========================================
-// 复习会话管理
+// 复习会话管理（使用 Custom Panel）
 // ========================================
 
 /**
- * 显示 SRS 复习会话组件（使用真实队列）
- * @param deckName - 可选的 Deck 名称过滤
- * @param openInCurrentPanel - 是否在当前面板打开（默认 false，在右侧新建面板）
+ * 启动复习会话
+ * 使用 Custom Panel 架构，不再创建虚拟块
+ * 
+ * @param deckName - 可选的牌组名称过滤
+ * @param openInCurrentPanel - 是否在当前面板打开（用于从 FlashcardHome 调用）
  */
 async function startReviewSession(deckName?: string, openInCurrentPanel: boolean = false) {
   try {
     reviewDeckFilter = deckName ?? null
-    const reviewSessionBlockId = await getOrCreateReviewSessionBlock(pluginName)
     const activePanelId = orca.state.activePanel
 
     if (!activePanelId) {
@@ -92,9 +85,16 @@ async function startReviewSession(deckName?: string, openInCurrentPanel: boolean
       return
     }
 
-    // 如果要求在当前面板打开（例如从 FlashcardHome 调用），直接导航到复习会话块
+    // 准备 viewArgs
+    const viewArgs = {
+      deckFilter: deckName ?? null,
+      hostPanelId: activePanelId
+    }
+
+    // 根据调用方式决定打开位置
     if (openInCurrentPanel) {
-      orca.nav.goTo("block", { blockId: reviewSessionBlockId }, activePanelId)
+      // 从 FlashcardHome 调用：在当前面板打开
+      orca.nav.goTo("srs.new-window", viewArgs, activePanelId)
       const message = deckName
         ? `已打开 ${deckName} 复习会话`
         : "复习会话已打开"
@@ -104,14 +104,22 @@ async function startReviewSession(deckName?: string, openInCurrentPanel: boolean
     }
 
     // 默认行为：在右侧面板打开
-    reviewHostPanelId = activePanelId
+    const panels = orca.state.panels
+    let rightPanelId: string | null = null
 
-    let rightPanelId = findRightPanel(orca.state.panels, activePanelId)
+    // 查找右侧面板
+    for (const [panelId, panel] of Object.entries(panels)) {
+      if (panel.parentId === activePanelId && panel.position === "right") {
+        rightPanelId = panelId
+        break
+      }
+    }
 
     if (!rightPanelId) {
+      // 创建右侧面板
       rightPanelId = orca.nav.addTo(activePanelId, "right", {
-        view: "block",
-        viewArgs: { blockId: reviewSessionBlockId },
+        view: "srs.new-window",
+        viewArgs,
         viewState: {}
       })
 
@@ -119,16 +127,15 @@ async function startReviewSession(deckName?: string, openInCurrentPanel: boolean
         orca.notify("error", "无法创建侧边面板", { title: "SRS 复习" })
         return
       }
-
-      schedulePanelResize(activePanelId, pluginName)
     } else {
-      orca.nav.goTo("block", { blockId: reviewSessionBlockId }, rightPanelId)
+      // 导航到现有右侧面板
+      orca.nav.goTo("srs.new-window", viewArgs, rightPanelId)
     }
 
+    // 聚焦到右侧面板
     if (rightPanelId) {
-      const targetPanelId = rightPanelId
       setTimeout(() => {
-        orca.nav.switchFocusTo(targetPanelId)
+        orca.nav.switchFocusTo(rightPanelId!)
       }, 100)
     }
 
@@ -149,7 +156,7 @@ async function startReviewSession(deckName?: string, openInCurrentPanel: boolean
 // ========================================
 
 /**
- * 打开 Flashcard Home 块
+ * 打开 Flashcard Home
  */
 async function openFlashcardHome() {
   try {
@@ -160,7 +167,7 @@ async function openFlashcardHome() {
       return
     }
 
-    // 使用自定义面板打开 Flashcard Home（不再创建虚拟块）
+    // 使用自定义面板打开 Flashcard Home
     orca.nav.goTo("srs.flashcard-home", {}, activePanelId)
     
     orca.notify("success", "Flashcard Home 已打开", { title: "Flashcard Home" })
@@ -169,13 +176,6 @@ async function openFlashcardHome() {
     console.error(`[${pluginName}] 打开 Flashcard Home 失败:`, error)
     orca.notify("error", `无法打开 Flashcard Home: ${error}`, { title: "Flashcard Home" })
   }
-}
-
-/**
- * 获取复习宿主面板 ID
- */
-export function getReviewHostPanelId(): string | null {
-  return reviewHostPanelId
 }
 
 /**
