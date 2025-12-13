@@ -50,11 +50,15 @@ export default function DirectionCardRenderer({
 
   // 从 orca.state 获取 block 内容
   const block = orca.state.blocks[card.id]
+  
+  // 边界检查：如果 block 不存在（可能已被删除），显示错误状态
+  const blockMissing = !block
 
   // 解析方向卡内容
   const dirInfo = useMemo(() => {
-    return extractDirectionInfo(block?.content, pluginName)
-  }, [block?.content, pluginName])
+    if (blockMissing) return null
+    return extractDirectionInfo(block.content, pluginName)
+  }, [block?.content, pluginName, blockMissing])
 
   // 计算预览间隔
   const intervals = useMemo(() => {
@@ -64,6 +68,7 @@ export default function DirectionCardRenderer({
   // 根据方向类型确定显示内容
   const { leftContent, rightContent, arrowSymbol, directionLabel, directionColor } = useMemo(() => {
     const isForward = card.directionType === "forward"
+    // 如果 block 不存在，回退到 card.front/card.back
     const leftText = dirInfo?.leftText || card.front || "（无内容）"
     const rightText = dirInfo?.rightText || card.back || "（无内容）"
 
@@ -83,6 +88,24 @@ export default function DirectionCardRenderer({
   const handleGrade = (grade: Grade) => {
     if (isGrading) return
     onGrade(grade)
+  }
+
+  // 如果 block 不存在，显示警告信息但仍允许操作（使用 card.front/card.back 兜底）
+  const renderBlockMissingWarning = () => {
+    if (!blockMissing) return null
+    return (
+      <div style={{
+        padding: "8px 12px",
+        marginBottom: "12px",
+        backgroundColor: "var(--orca-color-warning-1)",
+        border: "1px solid var(--orca-color-warning-3)",
+        borderRadius: "6px",
+        fontSize: "12px",
+        color: "var(--orca-color-warning-6)"
+      }}>
+        ⚠️ 原始块数据不可用，显示的是缓存内容
+      </div>
+    )
   }
 
   return (
@@ -108,6 +131,9 @@ export default function DirectionCardRenderer({
           maxWidth: "700px",
           boxShadow: "0 4px 20px rgba(0,0,0,0.1)"
         }}>
+          {/* 块数据缺失警告 */}
+          {renderBlockMissingWarning()}
+          
           {/* 顶部工具栏 */}
           <div style={{
             display: "flex",
