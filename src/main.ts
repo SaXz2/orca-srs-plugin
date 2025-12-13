@@ -107,9 +107,12 @@ async function startReviewSession(deckName?: string, openInCurrentPanel: boolean
     const panels = orca.state.panels
     let rightPanelId: string | null = null
 
-    // 查找右侧面板
+    // 查找已存在的 srs.new-window 右侧面板
     for (const [panelId, panel] of Object.entries(panels)) {
-      if (panel.parentId === activePanelId && panel.position === "right") {
+      // 同时检查位置和view类型，避免复用其他类型的右侧面板
+      if (panel.parentId === activePanelId && 
+          panel.position === "right" &&
+          panel.view === "srs.new-window") {
         rightPanelId = panelId
         break
       }

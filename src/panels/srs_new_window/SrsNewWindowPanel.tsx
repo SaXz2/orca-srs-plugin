@@ -157,6 +157,37 @@ export default function SrsNewWindowPanel(props: PanelProps) {
   }, [])
 
   /**
+   * 隐藏同面板内的其他 hidden 视图，避免占用布局空间
+   * 这解决从 FlashcardHome 导航过来时，FlashcardHome 虽被标记hidden但仍占用空间的问题
+   */
+  useEffect(() => {
+    const rootEl = rootRef.current
+    if (!rootEl) return
+
+    const panelEl = rootEl.closest(".orca-panel") as HTMLElement | null
+    if (!panelEl) return
+
+    const restored: Array<() => void> = []
+
+    // 查找同一面板内所有 hidden 的视图元素
+    const hiddenViews = Array.from(
+      panelEl.querySelectorAll<HTMLElement>(".orca-hideable.orca-hideable-hidden")
+    )
+
+    for (const hidden of hiddenViews) {
+      const prevDisplay = hidden.style.display
+      hidden.style.display = "none"
+      restored.push(() => {
+        hidden.style.display = prevDisplay
+      })
+    }
+
+    return () => {
+      for (const restore of restored) restore()
+    }
+  }, [])
+
+  /**
    * 注入 CSS 动画样式
    */
   useEffect(() => {
@@ -432,7 +463,9 @@ export default function SrsNewWindowPanel(props: PanelProps) {
    * 关闭面板
    */
   const handleClose = () => {
-    orca.nav.close(panelId)
+    // 使用 goBack() 返回之前的视图，而不是 close() 关闭面板
+    // 这样可以正确恢复视图历史（如从今日笔记打开FlashcardHome再打开复习面板）
+    orca.nav.goBack()
   }
 
   /**
@@ -440,34 +473,38 @@ export default function SrsNewWindowPanel(props: PanelProps) {
    */
   const handleJumpToCard = async (blockId: DbId) => {
     try {
-      // 优先使用 viewArgs 中的 hostPanelId
-      if (hostPanelId) {
-        orca.nav.goTo("block", { blockId }, hostPanelId)
-        orca.nav.switchFocusTo(hostPanelId)
-        return
+      // 新逻辑：点击跳转时，复习界面移到右侧，主面板显示卡片内容
+      // 1. 先在右侧创建新的复习面板
+      // 2. 然后在当前（主）面板导航到卡片block
+      
+      // 准备复习面板的viewArgs
+      const reviewViewArgs = {
+        deckFilter: deckFilter,
+        hostPanelId: panelId  // 设置hostPanelId为当前面板，以便后续跳转
       }
-
-      // 查找左侧面板（直接访问 orca.state）
-      let leftPanelId = findLeftPanel(orca.state.panels, panelId)
-
-      if (!leftPanelId) {
-        // 创建左侧面板
-        leftPanelId = orca.nav.addTo(panelId, "left", {
-          view: "block",
-          viewArgs: { blockId },
-          viewState: {}
-        })
-
-        if (leftPanelId) {
-          schedulePanelResize(leftPanelId, pluginName)
-          orca.nav.switchFocusTo(leftPanelId)
-        }
-      } else {
-        orca.nav.goTo("block", { blockId }, leftPanelId)
-        orca.nav.switchFocusTo(leftPanelId)
+      
+      // 在右侧创建复习面板
+      const rightPanelId = orca.nav.addTo(panelId, "right", {
+        view: "srs.new-window",
+        viewArgs: reviewViewArgs,
+        viewState: {}
+      })
+      
+      if (rightPanelId) {
+        // 调整面板宽度
+        schedulePanelResize(panelId, pluginName)
       }
+      
+      // 在当前面板（原复习面板位置）导航到卡片block
+      orca.nav.goTo("block", { blockId }, panelId)
+      
+      // 聚焦到主面板（显示卡片内容的面板）
+      orca.nav.switchFocusTo(panelId)
+      
+      console.log(`[SrsNewWindowPanel] 跳转到卡片: blockId=${blockId}, 复习面板移到右侧: ${rightPanelId}`)
     } catch (error) {
       console.error("[SrsNewWindowPanel] 跳转到卡片失败:", error)
+      // 降级：直接导航到block
       orca.nav.goTo("block", { blockId })
     }
   }

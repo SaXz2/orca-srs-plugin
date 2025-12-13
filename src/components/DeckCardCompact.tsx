@@ -1,5 +1,6 @@
 import type { DeckInfo } from "../srs/types"
 
+const { useState } = window.React
 const { Button } = orca.components
 
 type DeckCardCompactProps = {
@@ -9,71 +10,63 @@ type DeckCardCompactProps = {
 }
 
 export default function DeckCardCompact({ deck, onViewDeck, onReviewDeck }: DeckCardCompactProps) {
+  const [isHovered, setIsHovered] = useState(false)
   const dueCount = deck.overdueCount + deck.todayCount
 
   return (
     <div
+      onClick={() => onViewDeck(deck.name)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
-        border: "1px solid var(--orca-color-border-1)",
         borderRadius: "12px",
-        padding: "16px",
+        padding: "16px 20px",
         backgroundColor: "var(--orca-color-bg-1)",
+        cursor: "pointer",
         display: "flex",
-        flexDirection: "column",
-        gap: "12px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
-        transition: "border-color 0.2s ease, box-shadow 0.2s ease"
+        justifyContent: "space-between",
+        alignItems: "center",
+        transition: "background-color 0.2s ease",
+        ...(isHovered ? { backgroundColor: "var(--orca-color-bg-2)" } : {})
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-        <div>
-          <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--orca-color-text-1)" }}>
-            {deck.name}
-          </div>
-          <div style={{ fontSize: "12px", color: "var(--orca-color-text-3)", marginTop: "4px" }}>
-            新卡 {deck.newCount} · 到期 {dueCount} · 总数 {deck.totalCount}
-          </div>
+      {/* 左侧：名称 + 统计 */}
+      <div>
+        <div style={{ fontSize: "15px", fontWeight: 500, color: "var(--orca-color-text-1)" }}>
+          {deck.name}
         </div>
-
-        <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-          <Button variant="plain" onClick={() => onViewDeck(deck.name)} style={{ fontSize: "12px" }}>
-            查看
-          </Button>
-          <Button variant="solid" onClick={() => onReviewDeck(deck.name)} style={{ fontSize: "12px" }}>
-            复习
-          </Button>
+        <div style={{ fontSize: "12px", color: "var(--orca-color-text-3)", marginTop: "4px" }}>
+          {dueCount > 0 ? (
+            <span style={{ color: "var(--orca-color-warning-6)" }}>{dueCount} 待复习</span>
+          ) : (
+            <span>已完成</span>
+          )}
+          {deck.newCount > 0 && <span> · {deck.newCount} 新卡</span>}
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-        <StatPill label="新卡" value={deck.newCount} color="var(--orca-color-primary-6)" />
-        <StatPill label="今天" value={deck.todayCount} color="var(--orca-color-warning-6)" />
-        <StatPill label="已到期" value={deck.overdueCount} color="var(--orca-color-danger-6)" />
+      {/* 右侧：悬浮复习按钮 */}
+      <div style={{
+        opacity: isHovered ? 1 : 0,
+        transition: "opacity 0.2s ease",
+        pointerEvents: isHovered ? "auto" : "none"
+      }}>
+        <Button
+          variant="solid"
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation()
+            onReviewDeck(deck.name)
+          }}
+          style={{
+            padding: "8px 16px",
+            fontSize: "13px",
+            borderRadius: "16px"
+          }}
+        >
+          复习
+        </Button>
       </div>
     </div>
   )
 }
 
-type StatPillProps = {
-  label: string
-  value: number
-  color: string
-}
-
-function StatPill({ label, value, color }: StatPillProps) {
-  return (
-    <div
-      style={{
-        borderRadius: "8px",
-        border: "1px solid var(--orca-color-border-1)",
-        padding: "8px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "4px"
-      }}
-    >
-      <div style={{ fontSize: "12px", color: "var(--orca-color-text-3)" }}>{label}</div>
-      <div style={{ fontSize: "18px", fontWeight: 600, color }}>{value}</div>
-    </div>
-  )
-}

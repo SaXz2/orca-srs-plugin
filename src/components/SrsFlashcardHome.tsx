@@ -141,10 +141,12 @@ export default function SrsFlashcardHome({ panelId, blockId }: SrsFlashcardHomeP
   }, [loadData])
 
   const handleReviewAll = useCallback(() => {
+    // 在当前面板打开复习界面，替换FlashcardHome占满主面板
     void startReviewSession(undefined, true)
   }, [])
 
   const handleReviewDeck = useCallback((deckName: string) => {
+    // 在当前面板打开复习界面，替换FlashcardHome占满主面板
     void startReviewSession(deckName, true)
   }, [])
 
@@ -258,32 +260,28 @@ function DeckListView({
   }
 
   return (
-    <div style={{ padding: "24px 32px 40px 32px", maxWidth: "960px", margin: "0 auto" }}>
+    <div style={{ padding: "32px", maxWidth: "720px", margin: "0 auto" }}>
+      {/* 极简 Header */}
       <header style={{
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: "24px"
+        marginBottom: "32px"
       }}>
-        <div>
-          <div style={{ fontSize: "22px", fontWeight: 600 }}>Flashcard Home</div>
-          <div style={{ fontSize: "12px", color: "var(--orca-color-text-3)", marginTop: "4px" }}>
-            插件：{pluginName}
-          </div>
+        <div style={{ fontSize: "24px", fontWeight: 500, color: "var(--orca-color-text-1)" }}>
+          闪卡
         </div>
         <Button
           variant="plain"
           onClick={handleHeaderRefresh}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
+            padding: "6px",
             opacity: isRefreshing ? 0.5 : 1,
             pointerEvents: isRefreshing ? "none" : "auto"
           }}
+          title="刷新"
         >
-          <i className={`ti ${isRefreshing ? "ti-loader-3" : "ti-refresh"}`} />
-          {isRefreshing ? "刷新中..." : "刷新"}
+          <i className={`ti ${isRefreshing ? "ti-loader-3" : "ti-refresh"}`} style={{ fontSize: "18px" }} />
         </Button>
       </header>
 
@@ -300,15 +298,46 @@ function DeckListView({
         </div>
       )}
 
-      <StatsSection deckStats={deckStats} todayStats={todayStats} />
-      <QuickReviewSection
-          todayStats={todayStats}
-          deckStats={deckStats}
-          onReviewAll={onReviewAll}
-        />
+      {/* 单行统计 + 主按钮 */}
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "16px",
+        marginBottom: "40px"
+      }}>
+        <div style={{
+          fontSize: "14px",
+          color: "var(--orca-color-text-2)",
+          display: "flex",
+          gap: "16px"
+        }}>
+          <span><strong style={{ color: "var(--orca-color-warning-6)" }}>{todayStats?.pendingCount ?? 0}</strong> 待复习</span>
+          <span><strong style={{ color: "var(--orca-color-primary-6)" }}>{todayStats?.newCount ?? 0}</strong> 新卡</span>
+          <span><strong>{deckStats?.totalCards ?? 0}</strong> 总计</span>
+        </div>
+        <Button
+          variant="solid"
+          onClick={() => {
+            if ((todayStats?.pendingCount ?? 0) === 0) return
+            onReviewAll()
+          }}
+          style={{
+            padding: "14px 48px",
+            fontSize: "16px",
+            borderRadius: "24px",
+            fontWeight: 500,
+            opacity: (todayStats?.pendingCount ?? 0) === 0 ? 0.5 : 1,
+            pointerEvents: (todayStats?.pendingCount ?? 0) === 0 ? "none" : "auto"
+          }}
+        >
+          开始复习 ({todayStats?.pendingCount ?? 0})
+        </Button>
+      </div>
 
-      <section style={{ marginTop: "32px" }}>
-        <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px" }}>Deck 管理</div>
+      {/* Deck 列表 */}
+      <section>
+        <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--orca-color-text-3)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Decks</div>
         {deckStats && deckStats.decks.length > 0 ? (
           <div style={{
             display: "grid",

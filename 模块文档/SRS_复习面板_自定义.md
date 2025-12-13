@@ -15,13 +15,13 @@
 
 ### 核心文件
 
-| 文件                                                                                                                     | 说明                                |
-| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
-| [SrsNewWindowPanel.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/SrsNewWindowPanel.tsx)         | 复习会话面板主组件（692 行）        |
-| [BasicCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/BasicCardRenderer.tsx)         | Basic 卡片渲染器组件                |
-| [ClozeCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/ClozeCardRenderer.tsx)         | Cloze（填空）卡片渲染器组件         |
-| [DirectionCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/DirectionCardRenderer.tsx) | Direction（方向）卡片渲染器组件     |
-| [refactor_plan.md](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/refactor_plan.md)                   | 迁移计划和经验总结                  |
+| 文件                                                                                                                     | 说明                            |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| [SrsNewWindowPanel.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/SrsNewWindowPanel.tsx)         | 复习会话面板主组件（692 行）    |
+| [BasicCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/BasicCardRenderer.tsx)         | Basic 卡片渲染器组件            |
+| [ClozeCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/ClozeCardRenderer.tsx)         | Cloze（填空）卡片渲染器组件     |
+| [DirectionCardRenderer.tsx](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/DirectionCardRenderer.tsx) | Direction（方向）卡片渲染器组件 |
+| [refactor_plan.md](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/panels/srs_new_window/refactor_plan.md)                   | 迁移计划和经验总结              |
 
 ### 面板注册
 
@@ -127,10 +127,10 @@ flowchart TD
 
 ### 支持的卡片类型
 
-| 卡片类型       | 状态      | 说明                                |
-| -------------- | --------- | ----------------------------------- |
-| Basic Card     | ✅ 已完成 | 使用纯文本渲染 `front`/`back`       |
-| Cloze Card     | ✅ 已完成 | 使用 `renderFragments` 渲染填空内容 |
+| 卡片类型       | 状态      | 说明                                 |
+| -------------- | --------- | ------------------------------------ |
+| Basic Card     | ✅ 已完成 | 使用纯文本渲染 `front`/`back`        |
+| Cloze Card     | ✅ 已完成 | 使用 `renderFragments` 渲染填空内容  |
 | Direction Card | ✅ 已完成 | 阶段 5（使用 DirectionCardRenderer） |
 
 ### 复习功能
@@ -141,8 +141,62 @@ flowchart TD
 | 评分预览间隔                 | ✅   | `previewIntervals()`                         |
 | 埋藏（Bury）                 | ✅   | `buryCard()`                                 |
 | 暂停（Suspend）              | ✅   | `suspendCard()`                              |
-| 跳转到卡片                   | ✅   | `orca.nav.goTo("block", ...)`                |
+| 跳转到卡片（新交互）         | ✅   | 复习移右侧，主面板显示卡片                   |
 | 刷新队列                     | ✅   | `loadReviewQueue()`                          |
+
+### 面板交互模式
+
+> [!IMPORTANT]
+> 新增的全屏复习 + 跳转侧边栏交互模式。
+
+#### 点击复习（从 FlashcardHome）
+
+复习界面**替换 FlashcardHome 占满主面板**：
+
+```typescript
+// SrsFlashcardHome.tsx
+const handleReviewAll = useCallback(() => {
+  // openInCurrentPanel=true：在当前面板打开
+  void startReviewSession(undefined, true);
+}, []);
+```
+
+#### 点击跳转（复习中查看卡片源）
+
+新交互：复习界面**移到右侧**，主面板**显示卡片内容**：
+
+```typescript
+// SrsNewWindowPanel.tsx - handleJumpToCard
+// 1. 右侧创建复习面板
+const rightPanelId = orca.nav.addTo(panelId, "right", {
+  view: "srs.new-window",
+  viewArgs: reviewViewArgs,
+  viewState: {},
+});
+
+// 2. 主面板导航到卡片block
+orca.nav.goTo("block", { blockId }, panelId);
+```
+
+#### 隐藏视图处理
+
+Custom Panel 架构中需要处理同面板内的 hidden 视图，避免占用布局空间：
+
+```typescript
+// SrsNewWindowPanel.tsx
+useEffect(() => {
+  const panelEl = rootRef.current?.closest(".orca-panel");
+  if (!panelEl) return;
+
+  // 隐藏同面板内的其他 hidden 视图
+  const hiddenViews = panelEl.querySelectorAll(
+    ".orca-hideable.orca-hideable-hidden"
+  );
+  for (const hidden of hiddenViews) {
+    hidden.style.display = "none";
+  }
+}, []);
+```
 
 ### 键盘快捷键
 
