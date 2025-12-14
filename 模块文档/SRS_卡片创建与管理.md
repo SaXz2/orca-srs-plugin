@@ -85,6 +85,7 @@ await orca.commands.invokeEditorCommand(
 - ✓ 自动添加真正的 #card 标签（可交互 DOM 元素）
 - ✓ 支持撤销操作
 - ✓ 作为编辑器命令注册
+- ✓ **新创建卡片时自动清理残留的旧 SRS 属性**（解决删除标签后重新创建卡片沿用旧数据的问题）
 
 #### `extractCardType(block): "basic" | "cloze"`
 
@@ -250,6 +251,7 @@ block._repr = {
 | ---------------------------------------------------------------------------------------- | ------------------- |
 | [main.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/main.ts)                           | 卡片创建核心函数    |
 | [cardCreator.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardCreator.ts)         | Basic 卡片创建      |
+| [tagCleanup.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/tagCleanup.ts)           | SRS 属性清理        |
 | [tagPropertyInit.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/tagPropertyInit.ts) | 标签属性自动初始化  |
 | [storage.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/storage.ts)                 | 状态初始化          |
 | [types.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/types.ts)                     | ReviewCard 类型定义 |

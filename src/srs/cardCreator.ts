@@ -7,7 +7,8 @@
 import type { Block, CursorData } from "../orca.d.ts"
 import { BlockWithRepr, resolveFrontBack } from "./blockUtils"
 import { extractDeckName, extractCardType } from "./deckUtils"
-import { ensureCardSrsState } from "./storage"
+import { ensureCardSrsState, writeInitialSrsState } from "./storage"
+import { cleanupSrsProperties } from "./tagCleanup"
 import { isCardTag } from "./tagUtils"
 import { ensureCardTagProperties } from "./tagPropertyInit"
 
@@ -259,8 +260,16 @@ export async function makeCardFromBlock(cursor: CursorData, pluginName: string) 
     cardType: cardType
   }
 
-  // 确保存在初始 SRS 属性（避免重复执行转换时重置进度）
-  await ensureCardSrsState(blockId)
+  // 处理 SRS 状态
+  // 如果块之前没有 #card 标签（新创建卡片场景），需要先清理可能残留的旧 SRS 属性
+  // 这解决了用户删除 #card 标签后重新创建卡片时沿用旧数据的问题
+  if (!hasCardTag) {
+    await cleanupSrsProperties(blockId, pluginName)
+    await writeInitialSrsState(blockId)
+  } else {
+    // 块已有标签，使用 ensureCardSrsState 保持现有状态
+    await ensureCardSrsState(blockId)
+  }
 
   console.log(`[${pluginName}] ✓ 块 #${blockId} 已转换为 ${cardType} SRS 卡片`)
   console.log(`[${pluginName}] 最终 block._repr:`, block._repr)
