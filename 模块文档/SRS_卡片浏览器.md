@@ -115,7 +115,7 @@ CardListView 在选择 Deck 后显示，沿用了旧浏览器的列表体验。
 - Front 预览 + Cloze 编号（如 `#c2`）
 - 上次复习时间、到期时间（状态颜色）、复习次数
 - 额外标签徽章（排除 `#card`），点击可跳转到对应标签块
-- 点击后调用 `orca.nav.goTo(\"block\", { blockId: card.id })`
+- 点击卡片行或标签徽章：默认在当前面板右侧打开目标块（优先复用右侧面板，否则使用 `orca.nav.addTo(panelId, "right", { view: "block", viewArgs: { blockId } })` 创建）
 
 ---
 

@@ -199,6 +199,7 @@ export default function SrsFlashcardHome({ panelId, blockId }: SrsFlashcardHomeP
           deckName={selectedDeck}
           deckInfo={selectedDeckInfo}
           cards={selectedDeckCards}
+          hostPanelId={panelId}
           onBack={handleBackToDecks}
           onReviewDeck={handleReviewDeck}
           onRefresh={handleRefresh}
@@ -370,6 +371,7 @@ type CardListViewProps = {
   deckName: string | null
   deckInfo: DeckInfo | null
   cards: ReviewCard[]
+  hostPanelId: string
   onBack: () => void
   onReviewDeck: (deckName: string) => void
   onRefresh: () => void
@@ -381,6 +383,7 @@ function CardListView({
   deckName,
   deckInfo,
   cards,
+  hostPanelId,
   onBack,
   onReviewDeck,
   onRefresh,
@@ -519,7 +522,7 @@ function CardListView({
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {paginatedCards.map((card: ReviewCard) => (
-                <CardRow key={`${card.id}-${card.clozeNumber ?? "basic"}`} card={card} />
+                <CardRow key={`${card.id}-${card.clozeNumber ?? "basic"}`} card={card} hostPanelId={hostPanelId} />
               ))}
             </div>
             <Pagination
@@ -607,12 +610,37 @@ function DeckSummaryPill({ label, value, color }: DeckSummaryPillProps) {
 type TagBadgeProps = {
   name: string
   blockId: DbId
+  hostPanelId: string
 }
 
-function TagBadge({ name, blockId }: TagBadgeProps) {
+function openBlockInRightPanel(hostPanelId: string, targetBlockId: DbId) {
+  const panels = orca.state.panels
+  let rightPanelId: string | null = null
+
+  // 优先复用：当前面板右侧已存在的面板
+  for (const [panelId, panel] of Object.entries(panels)) {
+    if (panel.parentId === hostPanelId && panel.position === "right") {
+      rightPanelId = panelId
+      break
+    }
+  }
+
+  if (!rightPanelId) {
+    orca.nav.addTo(hostPanelId, "right", {
+      view: "block",
+      viewArgs: { blockId: targetBlockId },
+      viewState: {}
+    })
+    return
+  }
+
+  orca.nav.goTo("block", { blockId: targetBlockId }, rightPanelId)
+}
+
+function TagBadge({ name, blockId, hostPanelId }: TagBadgeProps) {
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation() // 阻止冒泡到 CardRow
-    orca.nav.goTo("block", { blockId })
+    openBlockInRightPanel(hostPanelId, blockId)
   }
 
   return (
@@ -642,12 +670,12 @@ function TagBadge({ name, blockId }: TagBadgeProps) {
   )
 }
 
-function CardRow({ card }: { card: ReviewCard }) {
+function CardRow({ card, hostPanelId }: { card: ReviewCard; hostPanelId: string }) {
   const filterType = getCardFilterType(card)
   const dueColor = getDueColor(filterType)
 
   const handleOpenCard = () => {
-    orca.nav.goTo("block", { blockId: card.id })
+    openBlockInRightPanel(hostPanelId, card.id)
   }
 
   return (
@@ -683,7 +711,7 @@ function CardRow({ card }: { card: ReviewCard }) {
       {card.tags && card.tags.length > 0 && (
         <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
           {card.tags.map(tag => (
-            <TagBadge key={tag.blockId} name={tag.name} blockId={tag.blockId} />
+            <TagBadge key={tag.blockId} name={tag.name} blockId={tag.blockId} hostPanelId={hostPanelId} />
           ))}
         </div>
       )}
