@@ -82,8 +82,13 @@ export function unregisterCommands(pluginName: string): void
 | `${pluginName}.openFlashcardHome` | 普通命令 | 打开 Flashcard Home 面板 | `openFlashcardHome`（从 main.ts 传入） |
 | `${pluginName}.makeCardFromBlock` | 编辑器命令 | 将块转为卡片 | `makeCardFromBlock` (从 cardCreator 导入) |
 | `${pluginName}.createCloze` | 编辑器命令 | 创建 Cloze 填空 | `createCloze` (从 clozeUtils 导入) |
+| `${pluginName}.createDirectionForward` | 编辑器命令 | 创建正向方向卡 → | `insertDirection` (从 directionUtils 导入) |
+| `${pluginName}.createDirectionBackward` | 编辑器命令 | 创建反向方向卡 ← | `insertDirection` (从 directionUtils 导入) |
+| `${pluginName}.makeAICard` | 编辑器命令 | AI 生成记忆卡片 | `makeAICardFromBlock` (从 ai/aiCardCreator 导入) |
+| `${pluginName}.testAIConnection` | 普通命令 | 测试 AI 连接 | `testAIConnection` (从 ai/aiService 导入) |
+| `${pluginName}.openNewReviewPanel` | 普通命令 | 打开新复习面板（测试/开发） | `orca.nav.goTo("srs.new-window")` |
 
-> 说明：复习入口不再注册为命令（不提供 `SRS: 开始复习` 命令面板项），工具栏按钮改为直接打开 `srs.new-window`（对应 `SrsNewWindowPanel`）。
+> 说明：复习入口不注册为命令面板项；当前编辑器工具栏也不提供复习按钮，复习需从 Flashcard Home 或相关面板入口进入。
 
 ### 依赖关系
 
@@ -154,7 +159,7 @@ orca.commands.registerEditorCommand(
 import { registerCommands, unregisterCommands } from "./srs/registry/commands"
 
 export async function load(_name: string) {
-  registerCommands(_name, startReviewSession, openFlashcardHome)
+  registerCommands(_name, openFlashcardHome)
 }
 
 export async function unload() {
@@ -183,19 +188,22 @@ export function unregisterUIComponents(pluginName: string): void
 
 ### 注册的 UI 组件
 
-#### 工具栏按钮（3 个）
+#### 工具栏按钮（1 个）
 
 | 按钮 ID | 图标 | 提示文本 | 关联命令 |
 |---------|------|----------|----------|
-| `${pluginName}.reviewButton` | `ti ti-cards` | 开始 SRS 复习 | 无（直接打开 `srs.new-window`） |
-| `${pluginName}.browserButton` | `ti ti-list` | 打开 Flashcard Home | `${pluginName}.openFlashcardHome` |
 | `${pluginName}.clozeButton` | `ti ti-braces` | 创建 Cloze 填空 | `${pluginName}.createCloze` |
 
-#### 斜杠命令（1 个）
+> 说明：根据当前设计，编辑器工具栏仅保留“填空卡”入口；其它功能通过斜杠命令或面板入口触发。
+
+#### 斜杠命令（4 个）
 
 | 命令 ID | 图标 | 分组 | 标题 | 关联命令 |
 |---------|------|------|------|----------|
 | `${pluginName}.makeCard` | `ti ti-card-plus` | SRS | 转换为记忆卡片 | `${pluginName}.makeCardFromBlock` |
+| `${pluginName}.directionForward` | `ti ti-arrow-right` | SRS | 创建正向方向卡 → (光标位置分隔问答) | `${pluginName}.createDirectionForward` |
+| `${pluginName}.directionBackward` | `ti ti-arrow-left` | SRS | 创建反向方向卡 ← (光标位置分隔问答) | `${pluginName}.createDirectionBackward` |
+| `${pluginName}.aiCard` | `ti ti-robot` | SRS | AI 生成记忆卡片 | `${pluginName}.makeAICard` |
 
 ### 依赖关系
 
