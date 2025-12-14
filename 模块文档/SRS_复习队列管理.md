@@ -46,7 +46,11 @@ flowchart TD
   back: string,   // 答案
   srs: SrsState,  // SRS 状态
   isNew: boolean, // 是否新卡
-  deck: string    // Deck 名称
+  deck: string,   // Deck 名称
+  tags?: {        // 额外标签（排除 #card）
+    name: string
+    blockId: DbId
+  }[]
 }
 ```
 

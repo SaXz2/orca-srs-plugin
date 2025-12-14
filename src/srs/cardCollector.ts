@@ -5,7 +5,7 @@
  */
 
 import type { Block, DbId } from "../orca.d.ts"
-import type { ReviewCard } from "./types"
+import type { ReviewCard, TagInfo } from "./types"
 import { BlockWithRepr, isSrsCardBlock, resolveFrontBack } from "./blockUtils"
 import { extractDeckName, extractCardType } from "./deckUtils"
 import { extractCardStatus } from "./cardStatusUtils"
@@ -17,6 +17,41 @@ import {
 import { getAllClozeNumbers } from "./clozeUtils"
 import { extractDirectionInfo, getDirectionList } from "./directionUtils"
 import { isCardTag } from "./tagUtils"
+
+/**
+ * 从块的 refs 中提取非 card 标签
+ * @param block - 块数据
+ * @returns TagInfo 数组
+ */
+function extractNonCardTags(block: BlockWithRepr): TagInfo[] {
+  const refs = block.refs || []
+  if (refs.length === 0) return []
+
+  const tags: TagInfo[] = []
+  const seenBlockIds = new Set<DbId>()
+
+  for (const ref of refs) {
+    // type=2 表示标签引用
+    if (ref.type !== 2) continue
+
+    const name = (ref.alias || "").trim()
+    if (!name) continue
+
+    // 排除 #card 标签（大小写不敏感）以及 card/* 的子标签
+    const aliasLower = name.toLowerCase()
+    if (aliasLower === "card" || aliasLower.startsWith("card/")) continue
+
+    if (seenBlockIds.has(ref.to)) continue
+    seenBlockIds.add(ref.to)
+
+    tags.push({
+      name,
+      blockId: ref.to
+    })
+  }
+
+  return tags
+}
 
 /**
  * 收集所有 SRS 块（带 #card 标签或 _repr.type="srs.card" 的块）
@@ -153,6 +188,7 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
           srs: srsState,
           isNew: !srsState.lastReviewed || srsState.reps === 0,
           deck: deckName,
+          tags: extractNonCardTags(block),
           clozeNumber, // 关键：标记当前复习的填空编号
           content: block.content  // 保存块内容用于渲染填空
         })
@@ -193,6 +229,7 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
           srs: srsState,
           isNew: !srsState.lastReviewed || srsState.reps === 0,
           deck: deckName,
+          tags: extractNonCardTags(block),
           directionType: dir // 关键：标记当前复习的方向类型
         })
       }
@@ -207,7 +244,8 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
         back,
         srs: srsState,
         isNew: !srsState.lastReviewed || srsState.reps === 0,
-        deck: deckName
+        deck: deckName,
+        tags: extractNonCardTags(block)
         // clozeNumber 和 directionType 都为 undefined（非特殊卡片）
       })
     }

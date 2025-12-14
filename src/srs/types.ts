@@ -24,6 +24,13 @@ export type ReviewCard = {
   clozeNumber?: number  // 填空编号（仅 cloze 卡片使用）
   directionType?: "forward" | "backward"  // 方向类型（仅 direction 卡片使用）
   content?: ContentFragment[]  // 块内容（仅 cloze 卡片使用，用于渲染填空）
+  tags?: TagInfo[]  // 额外标签（排除 #card）
+}
+
+// 标签信息
+export type TagInfo = {
+  name: string     // 标签名称
+  blockId: DbId    // 标签块 ID（用于跳转）
 }
 
 // Deck 统计信息

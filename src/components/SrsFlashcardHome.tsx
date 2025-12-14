@@ -604,6 +604,44 @@ function DeckSummaryPill({ label, value, color }: DeckSummaryPillProps) {
   )
 }
 
+type TagBadgeProps = {
+  name: string
+  blockId: DbId
+}
+
+function TagBadge({ name, blockId }: TagBadgeProps) {
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation() // 阻止冒泡到 CardRow
+    orca.nav.goTo("block", { blockId })
+  }
+
+  return (
+    <span
+      onClick={handleClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "2px 8px",
+        borderRadius: "10px",
+        backgroundColor: "var(--orca-color-primary-1)",
+        color: "var(--orca-color-primary-7)",
+        fontSize: "11px",
+        fontWeight: 500,
+        cursor: "pointer",
+        transition: "background-color 0.2s ease"
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.backgroundColor = "var(--orca-color-primary-2)"
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.backgroundColor = "var(--orca-color-primary-1)"
+      }}
+    >
+      #{name}
+    </span>
+  )
+}
+
 function CardRow({ card }: { card: ReviewCard }) {
   const filterType = getCardFilterType(card)
   const dueColor = getDueColor(filterType)
@@ -641,6 +679,14 @@ function CardRow({ card }: { card: ReviewCard }) {
         <span>复习 {card.srs.reps} 次</span>
         <span>状态：{filterLabel[filterType]}</span>
       </div>
+      {/* 额外标签显示（排除 #card） */}
+      {card.tags && card.tags.length > 0 && (
+        <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+          {card.tags.map(tag => (
+            <TagBadge key={tag.blockId} name={tag.name} blockId={tag.blockId} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
