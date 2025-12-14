@@ -760,6 +760,8 @@ export default function SrsNewWindowPanel(props: PanelProps) {
       return (
         <BasicCardRenderer
           card={currentCard}
+          panelId={panelId}
+          pluginName={pluginName}
           {...commonProps}
         />
       )

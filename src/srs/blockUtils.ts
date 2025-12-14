@@ -59,3 +59,29 @@ export function resolveFrontBack(block: BlockWithRepr): { front: string; back: s
   const back = removeHashTags(backRaw)
   return { front, back }
 }
+
+/**
+ * 获取块的所有子块文本内容（同级块）
+ * 用于复习界面显示多个答案子块
+ * 
+ * @param blockId - 父块 ID
+ * @param maxCount - 最大返回数量，默认 10
+ * @returns 子块文本数组
+ */
+export function getSiblingBlockTexts(blockId: number, maxCount: number = 10): string[] {
+  const block = orca.state.blocks?.[blockId] as BlockWithRepr | undefined
+  if (!block?.children || block.children.length === 0) return ["（无答案）"]
+  
+  const texts: string[] = []
+  const limit = Math.min(block.children.length, maxCount)
+  
+  for (let i = 0; i < limit; i++) {
+    const childId = block.children[i]
+    const child = orca.state.blocks?.[childId] as BlockWithRepr | undefined
+    if (child?.text) {
+      texts.push(removeHashTags(child.text))
+    }
+  }
+  
+  return texts.length > 0 ? texts : ["（无答案）"]
+}

@@ -8,11 +8,16 @@
 
 import type { ReviewCard, Grade } from "../../srs/types"
 import { formatInterval } from "../../srs/algorithm"
+import { getSiblingBlockTexts } from "../../srs/blockUtils"
+import { getReviewSettings } from "../../srs/settings/reviewSettingsSchema"
 
-const { Button } = orca.components
+const { useMemo } = window.React
+const { Button, Block, BlockPreviewPopup } = orca.components
 
 interface BasicCardRendererProps {
   card: ReviewCard
+  panelId: string  // 用于 Block 组件渲染
+  pluginName: string  // 插件名称，用于读取设置
   showAnswer: boolean
   isGrading: boolean
   intervals: { again: number; hard: number; good: number; easy: number }
@@ -30,6 +35,8 @@ interface BasicCardRendererProps {
  */
 export default function BasicCardRenderer({
   card,
+  panelId,
+  pluginName,
   showAnswer,
   isGrading,
   intervals,
@@ -40,6 +47,23 @@ export default function BasicCardRenderer({
   onJumpToCard
 }: BasicCardRendererProps) {
   const [isHovered, setIsHovered] = window.React.useState(false)
+  
+  // Block 组件在 Custom Panel 中会触发 React Error #185（无限循环）
+  // 已验证不可用，回退到纯文本 + BlockPreviewPopup 方案
+  const useBlockRendering = false
+  
+  // 获取复习设置（显示同级块配置）
+  const reviewSettings = useMemo(() => getReviewSettings(pluginName), [pluginName])
+  
+  // 获取同级块文本（根据设置决定显示单个还是多个）
+  const answerTexts = useMemo(() => {
+    if (!reviewSettings.showSiblingBlocks) {
+      // 未启用同级块显示，返回单个答案
+      return [card.back || "（无内容）"]
+    }
+    // 启用同级块显示，获取所有子块文本
+    return getSiblingBlockTexts(card.id as number, reviewSettings.maxSiblingBlocks)
+  }, [card.id, card.back, reviewSettings.showSiblingBlocks, reviewSettings.maxSiblingBlocks])
   
   const handleGrade = (grade: Grade) => {
     if (isGrading) return
@@ -86,6 +110,21 @@ export default function BasicCardRenderer({
             transition: "opacity 0.2s ease",
             pointerEvents: isHovered ? "auto" : "none"
           }}>
+            {/* 编辑按钮 - 使用 BlockPreviewPopup 实现弹窗编辑 */}
+            <BlockPreviewPopup blockId={card.id}>
+              <Button
+                variant="soft"
+                style={{
+                  padding: "6px",
+                  fontSize: "14px",
+                  minWidth: "32px",
+                  borderRadius: "8px"
+                }}
+                title="编辑 (E)"
+              >
+                <i className="ti ti-edit" />
+              </Button>
+            </BlockPreviewPopup>
             <Button
               variant="soft"
               onClick={onBury}
@@ -127,17 +166,29 @@ export default function BasicCardRenderer({
             </Button>
           </div>
 
-          {/* 题目内容 - 无标签 */}
-          <div style={{
-            fontSize: "22px",
-            color: "var(--orca-color-text-1)",
-            lineHeight: 2,
-            whiteSpace: "pre-wrap",
-            fontWeight: 400,
-            textAlign: "center",
-            minHeight: "60px"
-          }}>
-            {card.front || "(无内容)"}
+          {/* 题目内容 - 使用 Block 组件实现内联编辑 */}
+          <div 
+            className="srs-block-content"
+            style={{
+              fontSize: "18px",
+              color: "var(--orca-color-text-1)",
+              lineHeight: 1.8,
+              minHeight: "60px"
+            }}
+          >
+            {useBlockRendering ? (
+              <Block
+                panelId={panelId}
+                blockId={card.id}
+                blockLevel={0}
+                indentLevel={0}
+                renderingMode="normal"
+              />
+            ) : (
+              <div style={{ textAlign: "center", whiteSpace: "pre-wrap" }}>
+                {card.front || "(无内容)"}
+              </div>
+            )}
           </div>
 
           {/* 显示答案按钮 / 答案区域 */}
@@ -166,7 +217,7 @@ export default function BasicCardRenderer({
                 opacity: 0.6
               }} />
 
-              {/* 答案内容 - 无标签 */}
+              {/* 答案内容 - 支持显示多个同级块 */}
               <div 
                 className="srs-answer-reveal"
                 style={{
@@ -179,7 +230,11 @@ export default function BasicCardRenderer({
                   animation: "srsAnswerFadeIn 0.3s ease-out"
                 }}
               >
-                {card.back || "(无内容)"}
+                {answerTexts.map((text: string, index: number) => (
+                  <div key={index} style={{ marginBottom: index < answerTexts.length - 1 ? "16px" : 0 }}>
+                    {text}
+                  </div>
+                ))}
               </div>
 
               {/* 评分按钮 - 仅时间 */}
