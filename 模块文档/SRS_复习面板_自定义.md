@@ -370,3 +370,6 @@ function renderFragments(
 | [useReviewShortcuts.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/hooks/useReviewShortcuts.ts)                         | 快捷键 Hook       |
 | [cardStatusUtils.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/cardStatusUtils.ts)                                 | Bury/Suspend 实现 |
 | [renderers.ts](file:///d:/orca插件/虎鲸标记%20内置闪卡/src/srs/registry/renderers.ts)                                    | 面板注册          |
+> 说明：复习面板右上角会显示当前 Deck 状态。  
+> - 若从 FlashcardHome 的某个牌组进入，则显示 `Deck: <牌组名>`（表示已按牌组筛选）。  
+> - 若复习全部卡片，则显示 `Deck: 全部`（表示未筛选）。

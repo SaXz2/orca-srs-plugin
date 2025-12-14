@@ -547,18 +547,16 @@ export default function SrsNewWindowPanel(props: PanelProps) {
         alignItems: "center",
         gap: "8px"
       }}>
-        {deckFilter && (
-          <div style={{
-            padding: "4px 8px",
-            backgroundColor: "var(--orca-color-primary-1)",
-            color: "var(--orca-color-primary-6)",
-            borderRadius: "4px",
-            fontSize: "12px",
-            fontWeight: 500
-          }}>
-            Deck: {deckFilter}
-          </div>
-        )}
+        <div style={{
+          padding: "4px 8px",
+          backgroundColor: "var(--orca-color-primary-1)",
+          color: "var(--orca-color-primary-6)",
+          borderRadius: "4px",
+          fontSize: "12px",
+          fontWeight: 500
+        }}>
+          Deck: {deckFilter || "全部"}
+        </div>
         
         {/* 刷新按钮 */}
         <Button
