@@ -16,6 +16,7 @@ import SrsErrorBoundary from "../../components/SrsErrorBoundary"
 import { updateSrsState, updateClozeSrsState, updateDirectionSrsState } from "../../srs/storage"
 import { previewIntervals } from "../../srs/algorithm"
 import { buryCard, suspendCard } from "../../srs/cardStatusUtils"
+import { emitCardBuried, emitCardGraded, emitCardSuspended } from "../../srs/srsEvents"
 import { useReviewShortcuts } from "../../hooks/useReviewShortcuts"
 import { findLeftPanel, schedulePanelResize } from "../../srs/panelUtils"
 import { attachHideableDisplayManager } from "../../srs/hideableDisplayManager"
@@ -362,6 +363,9 @@ export default function SrsNewWindowPanel(props: PanelProps) {
         `[${cardTypeLabel}] 评分 ${grade.toUpperCase()} -> 下次 ${formatSimpleDate(result.state.due)}，间隔 ${result.state.interval} 天`
       )
 
+      // 通知 FlashcardHome 静默刷新（避免返回后仍显示旧队列）
+      emitCardGraded(currentCard.id, grade)
+
       setReviewedCount((prev: number) => prev + 1)
       setShowAnswer(false)
       
@@ -392,6 +396,9 @@ export default function SrsNewWindowPanel(props: PanelProps) {
     try {
       // 传递 clozeNumber 和 directionType 以正确埋藏特定卡片变种
       await buryCard(currentCard.id, currentCard.clozeNumber, currentCard.directionType)
+
+      // 通知 FlashcardHome 静默刷新
+      emitCardBuried(currentCard.id)
       
       // 根据卡片类型显示不同的日志
       const cardTypeLabel = currentCard.clozeNumber !== undefined 
@@ -424,6 +431,9 @@ export default function SrsNewWindowPanel(props: PanelProps) {
       // Suspend 操作会暂停整个块（#card 标签 status=suspend）
       // 这是设计意图：暂停一个变种意味着暂停整个卡片
       await suspendCard(currentCard.id)
+
+      // 通知 FlashcardHome 静默刷新
+      emitCardSuspended(currentCard.id)
       
       // 根据卡片类型显示不同的提示
       const hasMultipleVariants = currentCard.clozeNumber !== undefined || currentCard.directionType !== undefined

@@ -126,6 +126,7 @@ CardListView 在选择 Deck 后显示，沿用了旧浏览器的列表体验。
 3. `calculateHomeStats()` 生成仪表板数据。
 4. React state 保存：`deckStats`、`todayStats`、`cards`、`viewMode`、`selectedDeck`、加载状态。
 5. 复习入口调用 `startReviewSession(deckName?)`，`main.ts` 会记录 `reviewDeckFilter`，并在 `SrsReviewSessionRenderer` 里过滤队列。
+6. **实时刷新**：复习面板评分/埋藏/暂停成功后通过 `orca.broadcasts` 广播事件，FlashcardHome 订阅后触发 `loadData(false)` 静默刷新，避免返回后仍显示旧统计（详见 `模块文档/SRS_事件通信.md`）。
 
 ---
 

@@ -144,6 +144,10 @@ flowchart TD
 | 跳转到卡片（新交互）         | ✅   | 复习移右侧，主面板显示卡片                   |
 | 刷新队列                     | ✅   | `loadReviewQueue()`                          |
 
+### 与 FlashcardHome 的实时同步（2025-12-14 更新）
+
+为避免“评分/埋藏/暂停后返回 FlashcardHome 仍显示旧统计、旧队列”，复习面板在相关操作成功后会通过 `orca.broadcasts` 广播事件，FlashcardHome 监听事件并触发 `loadData(false)` 静默刷新（详见 `模块文档/SRS_事件通信.md`）。
+
 ### 面板交互模式
 
 > [!IMPORTANT]

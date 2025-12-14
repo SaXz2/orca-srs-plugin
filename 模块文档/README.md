@@ -52,6 +52,10 @@
    - 复习队列的构建和管理
    - 关键文件：`src/srs/cardCollector.ts`、`src/srs/reviewSessionManager.ts`
 
+10. **[SRS\_事件通信.md](SRS_事件通信.md)** ⭐ 新增
+   - 基于 Orca broadcasts 的跨组件事件通知
+   - 关键文件：`src/srs/srsEvents.ts`
+
 ## 文档结构说明
 
 每个模块文档采用统一的结构：

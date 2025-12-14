@@ -3,6 +3,7 @@ import type { DbId } from "../orca.d.ts"
 import type { DeckInfo, DeckStats, ReviewCard, TodayStats } from "../srs/types"
 import DeckCardCompact from "./DeckCardCompact"
 import { calculateDeckStats, collectReviewCards, startReviewSession, getPluginName } from "../main.ts"
+import { SRS_EVENTS } from "../srs/srsEvents"
 
 const { useState, useEffect, useMemo, useCallback, useRef } = window.React
 const { Button } = orca.components
@@ -134,6 +135,23 @@ export default function SrsFlashcardHome({ panelId, blockId }: SrsFlashcardHomeP
 
   useEffect(() => {
     void loadData(true)
+  }, [loadData])
+
+  // 监听 SRS 事件：复习面板评分/埋藏/暂停后，FlashcardHome 静默刷新数据
+  useEffect(() => {
+    const handleCardGraded = () => void loadData(false)
+    const handleCardBuried = () => void loadData(false)
+    const handleCardSuspended = () => void loadData(false)
+
+    orca.broadcasts.registerHandler(SRS_EVENTS.CARD_GRADED, handleCardGraded)
+    orca.broadcasts.registerHandler(SRS_EVENTS.CARD_BURIED, handleCardBuried)
+    orca.broadcasts.registerHandler(SRS_EVENTS.CARD_SUSPENDED, handleCardSuspended)
+
+    return () => {
+      orca.broadcasts.unregisterHandler(SRS_EVENTS.CARD_GRADED, handleCardGraded)
+      orca.broadcasts.unregisterHandler(SRS_EVENTS.CARD_BURIED, handleCardBuried)
+      orca.broadcasts.unregisterHandler(SRS_EVENTS.CARD_SUSPENDED, handleCardSuspended)
+    }
   }, [loadData])
 
   const handleRefresh = useCallback(() => {
