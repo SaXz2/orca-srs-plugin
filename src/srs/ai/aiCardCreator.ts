@@ -8,6 +8,7 @@ import type { CursorData, Block } from "../../orca.d.ts"
 import { generateCardFromAI } from "./aiService"
 import { ensureCardSrsState } from "../storage"
 import { BlockWithRepr } from "../blockUtils"
+import { ensureCardTagProperties } from "../tagPropertyInit"
 
 /**
  * AI 卡片创建结果
@@ -138,10 +139,18 @@ export async function makeAICardFromBlock(
       "core.editor.insertTag",
       cursor,
       childBlockId,
-      "card"
+      "card",
+      [
+        { name: "type", value: "basic" },
+        { name: "牌组", value: [] },  // 空数组表示未设置牌组
+        { name: "status", value: "" }  // 空字符串表示正常状态
+      ]
     )
     
     console.log(`[${pluginName}] #card 标签添加成功`)
+    
+    // 确保 #card 标签块有属性定义（首次使用时自动初始化）
+    await ensureCardTagProperties(pluginName)
     
     // 4. 设置子块的 _repr 为 SRS 卡片
     const updatedChildBlock = orca.state.blocks[childBlockId] as BlockWithRepr

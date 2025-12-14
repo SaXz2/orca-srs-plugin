@@ -11,6 +11,7 @@ import type { CursorData, Block, ContentFragment, DbId } from "../orca.d.ts"
 import type { BlockWithRepr } from "./blockUtils"
 import { writeInitialDirectionSrsState } from "./storage"
 import { isCardTag } from "./tagUtils"
+import { ensureCardTagProperties } from "./tagPropertyInit"
 
 /**
  * 方向类型
@@ -121,8 +122,15 @@ export async function insertDirection(
         cursor,
         blockId,
         "card",
-        [{ name: "type", value: "direction" }]
+        [
+          { name: "type", value: "direction" },
+          { name: "牌组", value: [] },  // 空数组表示未设置牌组
+          { name: "status", value: "" }  // 空字符串表示正常状态
+        ]
       )
+      
+      // 确保 #card 标签块有属性定义（首次使用时自动初始化）
+      await ensureCardTagProperties(pluginName)
     } else {
       // 更新已有标签的 type 属性
       const cardRef = block.refs?.find(

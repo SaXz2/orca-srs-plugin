@@ -9,6 +9,7 @@ import { BlockWithRepr, resolveFrontBack } from "./blockUtils"
 import { extractDeckName, extractCardType } from "./deckUtils"
 import { ensureCardSrsState } from "./storage"
 import { isCardTag } from "./tagUtils"
+import { ensureCardTagProperties } from "./tagPropertyInit"
 
 /**
  * 扫描所有带 #card 标签的块，并将它们转换为 SRS 卡片
@@ -207,15 +208,25 @@ export async function makeCardFromBlock(cursor: CursorData, pluginName: string) 
       console.log(`[${pluginName}] 使用 core.editor.insertTag 添加 #card 标签`)
       
       // 使用官方的 insertTag 命令
+      // 同时创建三个默认属性：type、牌组、status
+      // 这样新用户首次使用时不需要手动配置这些属性
       const tagId = await orca.commands.invokeEditorCommand(
         "core.editor.insertTag",
         cursor,
         blockId,
-        "card"
+        "card",
+        [
+          { name: "type", value: "basic" },
+          { name: "牌组", value: [] },  // 空数组表示未设置牌组（用户可后续选择）
+          { name: "status", value: "" }  // 空字符串表示正常状态
+        ]
       )
       
       console.log(`[${pluginName}] ✓ 标签添加成功，tagId: ${tagId}`)
       console.log(`[${pluginName}] 添加后 block.refs:`, orca.state.blocks[blockId]?.refs)
+      
+      // 确保 #card 标签块有属性定义（首次使用时自动初始化）
+      await ensureCardTagProperties(pluginName)
     } catch (error) {
       console.error(`[${pluginName}] ✗ 添加标签失败:`, error)
       orca.notify("error", `添加标签失败: ${error}`, { title: "SRS" })

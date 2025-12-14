@@ -11,6 +11,7 @@ import type { CursorData, Block, ContentFragment } from "../orca.d.ts"
 import { BlockWithRepr } from "./blockUtils"
 import { writeInitialClozeSrsState } from "./storage"
 import { isCardTag } from "./tagUtils"
+import { ensureCardTagProperties } from "./tagPropertyInit"
 
 /**
  * 从 ContentFragment 数组中提取当前最大的 cloze 编号
@@ -272,9 +273,16 @@ export async function createCloze(
           null,
           blockId,
           "card",
-          [{ name: "type", value: "cloze" }]
+          [
+            { name: "type", value: "cloze" },
+            { name: "牌组", value: [] },  // 空数组表示未设置牌组
+            { name: "status", value: "" }  // 空字符串表示正常状态
+          ]
         )
         console.log(`[${pluginName}] 已添加 #card 标签并设置 type=cloze`)
+        
+        // 确保 #card 标签块有属性定义（首次使用时自动初始化）
+        await ensureCardTagProperties(pluginName)
       } catch (error) {
         console.error(`[${pluginName}] 添加 #card 标签失败:`, error)
       }
