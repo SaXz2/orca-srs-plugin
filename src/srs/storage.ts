@@ -28,8 +28,19 @@ const getBlockCached = async (blockId: DbId): Promise<Block | undefined> => {
   return block
 }
 
+/**
+ * 清除指定块的缓存
+ * 在外部模块修改块属性后调用，确保下次读取获取最新数据
+ * 
+ * @param blockId - 块 ID
+ */
+export const invalidateBlockCache = (blockId: DbId): void => {
+  blockCache.delete(blockId)
+}
+
 const hasPropertyWithPrefix = (block: Block | undefined, prefix: string): boolean =>
   !!block?.properties?.some(prop => prop.name.startsWith(prefix))
+
 
 // ============================================================================
 // 工具函数

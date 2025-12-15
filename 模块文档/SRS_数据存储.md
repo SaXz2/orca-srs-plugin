@@ -63,6 +63,18 @@ Cloze 卡片的每个填空有独立的 SRS 状态，属性名包含填空编号
 
 内部保存函数，统一处理普通卡片和 Cloze 卡片的状态保存。
 
+#### `invalidateBlockCache(blockId): void`（导出）
+
+清除指定块的内部缓存。当外部模块（如 `cardStatusUtils.ts`）直接修改块属性后调用，确保下次 `collectReviewCards` 读取最新数据。
+
+```typescript
+import { invalidateBlockCache } from "./storage"
+
+// 修改属性后清除缓存
+await orca.commands.invokeEditorCommand("core.editor.setProperties", ...)
+invalidateBlockCache(blockId)
+```
+
 ### 公开 API - 普通卡片
 
 #### `loadCardSrsState(blockId): Promise<SrsState>`

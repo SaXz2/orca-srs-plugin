@@ -8,6 +8,8 @@
 
 import type { DbId, Block } from "../orca.d.ts"
 import { isCardTag } from "./tagUtils"
+import { invalidateBlockCache } from "./storage"
+
 
 /**
  * 卡片状态类型
@@ -221,8 +223,11 @@ export async function buryCard(
       "core.editor.setProperties",
       null,
       [blockId],
-      [{ name: propertyName, type: "datetime", value: tomorrow.toISOString() }]
+      [{ name: propertyName, type: 5, value: tomorrow }]
     )
+    
+    // 清除缓存，确保下次 collectReviewCards 读取最新数据
+    invalidateBlockCache(blockId)
     
     console.log(`[SRS] 卡片 #${blockId} 已埋藏，明天 ${tomorrow.toLocaleDateString()} 再复习`)
   } catch (error) {
@@ -230,3 +235,5 @@ export async function buryCard(
     throw error
   }
 }
+
+
