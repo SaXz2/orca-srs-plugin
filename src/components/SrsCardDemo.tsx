@@ -37,56 +37,6 @@ function ReviewBlock({ blockId, panelId, fallback, hideChildren = false }: Revie
   // 使用 ref 存储防抖定时器 ID，避免闭包问题
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 修改 2：注入全局 CSS 样式隐藏 Block 组件的编辑器 UI 元素
-  useEffect(() => {
-    const styleId = 'srs-review-block-styles'
-    
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style')
-      style.id = styleId
-      style.textContent = `
-        /* 隐藏 bullet point、块手柄、拖拽手柄等 */
-        .srs-block-container .orca-block-handle,
-        .srs-block-container .orca-block-bullet,
-        .srs-block-container .orca-block-drag-handle,
-        .srs-block-container .orca-repr-handle,
-        .srs-block-container .orca-repr-collapse,
-        .srs-block-container [class*="handle"],
-        .srs-block-container [class*="bullet"],
-        .srs-block-container [data-role="handle"],
-        .srs-block-container [data-role="bullet"] {
-          display: none !important;
-          visibility: hidden !important;
-          width: 0 !important;
-          height: 0 !important;
-        }
-        
-        /* 移除缩进和间距 */
-        .srs-block-container .orca-block,
-        .srs-block-container .orca-repr-main {
-          padding-left: 0 !important;
-          margin-left: 0 !important;
-        }
-        
-        /* 隐藏子块（仅在题目区域） */
-        .srs-block-hide-children [class*="children"],
-        .srs-block-hide-children [data-role*="children"],
-        .srs-block-hide-children [data-testid*="children"] {
-          display: none !important;
-          visibility: hidden !important;
-        }
-      `
-      document.head.appendChild(style)
-    }
-    
-    return () => {
-      const style = document.getElementById(styleId)
-      if (style && !document.querySelector('.srs-card-container')) {
-        style.remove()
-      }
-    }
-  }, [])
-
   // 修改 3：增强 MutationObserver 的隐藏范围
   useEffect(() => {
     if (!hideChildren) return

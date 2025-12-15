@@ -79,6 +79,10 @@ stateDiagram-v2
 - 使用 `renderingMode="simple"` 渲染
 - MutationObserver 隐藏子块（防止答案泄露）
 - 支持在复习中直接编辑
+- ~~动态注入 CSS 隐藏块手柄和 bullet~~（已删除，2025-12-15）
+  - 之前通过 `useEffect` 动态注入全局 CSS 样式来隐藏 `.srs-block-container` 内的编辑器 UI 元素
+  - 现在仅依赖 `MutationObserver` 的 JavaScript 逻辑来隐藏这些元素
+  - 简化了代码，避免了全局 CSS 污染
 
 #### 评分按钮
 
@@ -332,39 +336,34 @@ stateDiagram-v2
 - `isMaximized` 默认值改为 `true`，复习界面启动即为最大化状态
 - 最大化按钮已隐藏（用户无需手动切换）
 
-#### 全屏 CSS 注入
+#### 全屏实现方式（2025-12-15 更新）
 
-通过动态注入 CSS 让复习界面撑满整个 `block-editor`：
+**已移除动态 CSS 注入**：
 
-```css
-.orca-block-editor[maximize="1"] {
-  height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-/* 中间层级全部设置 flex: 1 和 height: 100% */
-.orca-block-editor[maximize="1"] .orca-block-editor-main,
-.orca-block-editor[maximize="1"] .orca-block-editor-blocks,
-.orca-block-editor[maximize="1"] .orca-block[data-type="srs.review-session"],
-.orca-block-editor[maximize="1"] .srs-repr-review-session,
-.orca-block-editor[maximize="1"] .orca-repr-main,
-.orca-block-editor[maximize="1"] .srs-repr-review-session-content,
-.orca-block-editor[maximize="1"] .srs-review-session-panel {
-  flex: 1 !important;
-  height: 100% !important;
-}
-```
+- ~~之前通过动态注入 CSS 样式来让复习界面撑满整个 `block-editor`~~（已删除）
+- 现在仅通过 JavaScript 控制 DOM 元素的显示/隐藏来实现最大化效果
 
-#### 隐藏的 UI 元素
+**当前实现方式**：
 
-最大化模式下隐藏以下编辑器 UI：
+1. **设置 maximize 属性**：`blockEditor.setAttribute('maximize', '1')`
+2. **隐藏编辑器 UI 元素**（通过 JavaScript 设置 `display: 'none'`）：
+   - `.orca-block-editor-none-editable`（query tabs）
+   - `.orca-block-editor-go-btns`（上下导航按钮）
+   - `.orca-block-editor-sidetools`（侧边工具栏）
+   - `.orca-panel-drag-handle`（面板拖拽手柄）
+   - `.orca-repr-main-none-editable`（块手柄、折叠按钮）
+   - `.orca-breadcrumb`（面包屑导航）
+3. **批量隐藏块手柄和 bullet**（通过 `querySelectorAll` 遍历设置）：
+   - `.orca-block-handle`、`.orca-repr-handle`
+   - `.orca-block-bullet`、`[data-role="bullet"]`
+   - `.orca-block-drag-handle`
+   - `.orca-repr-collapse`、`[class*="collapse"]`
 
-- `.orca-block-editor-none-editable`（query tabs）
-- `.orca-block-editor-go-btns`（上下导航按钮）
-- `.orca-block-editor-sidetools`（侧边工具栏）
-- `.orca-panel-drag-handle`（面板拖拽手柄）
-- `.orca-repr-main-none-editable`（块手柄、折叠按钮）
-- `.orca-breadcrumb`（面包屑导航）
+**优势**：
+
+- 更简洁，无需维护复杂的 CSS 字符串
+- 避免全局 CSS 污染
+- 更容易调试和维护
 
 #### 面板宽度 50/50 分割
 

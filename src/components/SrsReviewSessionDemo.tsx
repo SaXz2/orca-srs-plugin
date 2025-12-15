@@ -98,66 +98,6 @@ export default function SrsReviewSession({
       collapseButtons.forEach((el: Element) => {
         (el as HTMLElement).style.display = 'none'
       })
-      
-      // 注入 CSS 让复习界面撑满整个 block-editor
-      const fullscreenStyleId = 'srs-fullscreen-styles'
-      if (!document.getElementById(fullscreenStyleId)) {
-        const style = document.createElement('style')
-        style.id = fullscreenStyleId
-        style.textContent = `
-          /* 让复习界面撑满整个 block-editor */
-          .orca-block-editor[maximize="1"] {
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-          }
-          .orca-block-editor[maximize="1"] .orca-block-editor-main {
-            flex: 1 !important;
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            overflow: hidden !important;
-          }
-          .orca-block-editor[maximize="1"] .orca-block-editor-blocks {
-            flex: 1 !important;
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            overflow: hidden !important;
-          }
-          .orca-block-editor[maximize="1"] .orca-block[data-type="srs.review-session"] {
-            flex: 1 !important;
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .orca-block-editor[maximize="1"] .srs-repr-review-session {
-            flex: 1 !important;
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-          }
-          .orca-block-editor[maximize="1"] .orca-repr-main {
-            flex: 1 !important;
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-          }
-          .orca-block-editor[maximize="1"] .srs-repr-review-session-content {
-            flex: 1 !important;
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-          }
-          .orca-block-editor[maximize="1"] .srs-review-session-panel {
-            flex: 1 !important;
-            height: 100% !important;
-          }
-        `
-        document.head.appendChild(style)
-      }
     } else {
       blockEditor.removeAttribute('maximize')
       // 恢复显示
