@@ -168,28 +168,18 @@ export async function scanCardsFromTags(pluginName: string) {
  * @returns 转换结果（包含 blockId 和原始 _repr，供 undo 使用）
  */
 export async function makeCardFromBlock(cursor: CursorData, pluginName: string) {
-  console.log(`[${pluginName}] ========== makeCardFromBlock 开始执行 ==========`)
-  
   if (!cursor || !cursor.anchor || !cursor.anchor.blockId) {
     orca.notify("error", "无法获取光标位置")
-    console.error(`[${pluginName}] 错误：无法获取光标位置`)
     return null
   }
 
   const blockId = cursor.anchor.blockId
-  console.log(`[${pluginName}] blockId: ${blockId}`)
-  
   const block = orca.state.blocks[blockId] as BlockWithRepr
 
   if (!block) {
     orca.notify("error", "未找到当前块")
-    console.error(`[${pluginName}] 错误：未找到块 #${blockId}`)
     return null
   }
-
-  console.log(`[${pluginName}] 原始块文本: "${block.text}"`)
-  console.log(`[${pluginName}] 原始块 _repr:`, block._repr)
-  console.log(`[${pluginName}] 原始块 refs:`, block.refs)
 
   // 保存原始 _repr 和文本供撤销使用
   const originalRepr = block._repr ? { ...block._repr } : { type: "text" }
@@ -200,57 +190,40 @@ export async function makeCardFromBlock(cursor: CursorData, pluginName: string) 
     ref.type === 2 &&      // RefType.Property（标签引用）
     isCardTag(ref.alias)   // 标签名称为 "card"（大小写不敏感）
   )
-  
-  console.log(`[${pluginName}] 是否已有 #card 标签: ${hasCardTag}`)
 
   // 如果没有标签，使用官方命令添加
   if (!hasCardTag) {
     try {
-      console.log(`[${pluginName}] 使用 core.editor.insertTag 添加 #card 标签`)
-      
       // 使用官方的 insertTag 命令
       // 同时创建三个默认属性：type、牌组、status
-      // 这样新用户首次使用时不需要手动配置这些属性
-      const tagId = await orca.commands.invokeEditorCommand(
+      await orca.commands.invokeEditorCommand(
         "core.editor.insertTag",
         cursor,
         blockId,
         "card",
         [
           { name: "type", value: "basic" },
-          { name: "牌组", value: [] },  // 空数组表示未设置牌组（用户可后续选择）
+          { name: "牌组", value: [] },  // 空数组表示未设置牌组
           { name: "status", value: "" }  // 空字符串表示正常状态
         ]
       )
       
-      console.log(`[${pluginName}] ✓ 标签添加成功，tagId: ${tagId}`)
-      console.log(`[${pluginName}] 添加后 block.refs:`, orca.state.blocks[blockId]?.refs)
-      
       // 确保 #card 标签块有属性定义（首次使用时自动初始化）
       await ensureCardTagProperties(pluginName)
     } catch (error) {
-      console.error(`[${pluginName}] ✗ 添加标签失败:`, error)
+      console.error(`[${pluginName}] 添加标签失败:`, error)
       orca.notify("error", `添加标签失败: ${error}`, { title: "SRS" })
       return null
     }
-  } else {
-    console.log(`[${pluginName}] 块已有 #card 标签，跳过添加`)
   }
 
   // 直接转换为 SRS 卡片
   const { front, back } = resolveFrontBack(block)
 
-  console.log(`[${pluginName}] 题目（front）: "${front}"`)
-  console.log(`[${pluginName}] 答案（back）: "${back}"`)
-
   // 识别卡片类型（basic 或 cloze）
-  // 重新获取块以获取最新的 refs（包括刚添加的标签）
   const updatedBlock = orca.state.blocks[blockId] as BlockWithRepr
   const cardType = extractCardType(updatedBlock)
   const reprType = cardType === "cloze" ? "srs.cloze-card" : "srs.card"
-
-  console.log(`[${pluginName}] 卡片类型: ${cardType}`)
-  console.log(`[${pluginName}] _repr.type: ${reprType}`)
 
   // 修改块的 _repr（Valtio 会自动触发响应式更新）
   block._repr = {
@@ -262,7 +235,6 @@ export async function makeCardFromBlock(cursor: CursorData, pluginName: string) 
 
   // 处理 SRS 状态
   // 如果块之前没有 #card 标签（新创建卡片场景），需要先清理可能残留的旧 SRS 属性
-  // 这解决了用户删除 #card 标签后重新创建卡片时沿用旧数据的问题
   if (!hasCardTag) {
     await cleanupSrsProperties(blockId, pluginName)
     await writeInitialSrsState(blockId)
@@ -270,10 +242,6 @@ export async function makeCardFromBlock(cursor: CursorData, pluginName: string) 
     // 块已有标签，使用 ensureCardSrsState 保持现有状态
     await ensureCardSrsState(blockId)
   }
-
-  console.log(`[${pluginName}] ✓ 块 #${blockId} 已转换为 ${cardType} SRS 卡片`)
-  console.log(`[${pluginName}] 最终 block._repr:`, block._repr)
-  console.log(`[${pluginName}] 最终 block.refs:`, block.refs)
 
   // 显示通知
   const cardTypeLabel = cardType === "cloze" ? "填空卡片" : "记忆卡片"
@@ -286,3 +254,4 @@ export async function makeCardFromBlock(cursor: CursorData, pluginName: string) 
   // 返回结果供 undo 使用
   return { blockId, originalRepr, originalText }
 }
+
