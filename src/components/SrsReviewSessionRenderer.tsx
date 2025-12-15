@@ -2,6 +2,7 @@ import type { DbId } from "../orca.d.ts"
 import type { ReviewCard } from "../srs/types"
 import SrsReviewSessionDemo from "./SrsReviewSessionDemo"
 import SrsErrorBoundary from "./SrsErrorBoundary"
+import { findLeftPanel, schedulePanelResize } from "../srs/panelUtils"
 
 const { useEffect, useState } = window.React
 const { BlockShell, Button } = orca.components
@@ -80,7 +81,6 @@ export default function SrsReviewSessionRenderer(props: RendererProps) {
 
   const handleJumpToCard = async (cardBlockId: DbId) => {
     try {
-      const { findLeftPanel, schedulePanelResize } = await import("../srs/panelUtils")
       const { getPluginName, getReviewHostPanelId } = await import("../main")
       const currentPluginName = typeof getPluginName === "function" ? getPluginName() : "orca-srs"
       
