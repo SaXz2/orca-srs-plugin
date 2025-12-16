@@ -410,10 +410,14 @@ export default function SrsReviewSession({
           backgroundColor: "var(--orca-color-bg-0)"
         }}
       >
-        <div style={{
-          height: "4px",
-          backgroundColor: "var(--orca-color-bg-2)"
-        }}>
+        <div 
+          className="srs-review-progress-bar"
+          contentEditable={false}
+          style={{
+            height: "4px",
+            backgroundColor: "var(--orca-color-bg-2)"
+          }}
+        >
           <div style={{
             height: "100%",
             width: `${(currentIndex / totalCards) * 100}%`,
@@ -422,14 +426,16 @@ export default function SrsReviewSession({
           }} />
         </div>
 
-        <div style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--orca-color-border-1)",
-          backgroundColor: "var(--orca-color-bg-1)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between"
-        }}>
+        <div 
+          className="srs-review-header"
+          contentEditable={false}
+          style={{
+            padding: "12px 16px",
+            borderBottom: "1px solid var(--orca-color-border-1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}>
           <div contentEditable={false} style={{ userSelect: 'none' }}>
             <div style={{
               fontSize: "14px",
