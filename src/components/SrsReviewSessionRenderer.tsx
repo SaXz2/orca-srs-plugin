@@ -73,7 +73,8 @@ export default function SrsReviewSessionRenderer(props: RendererProps) {
   }
 
   const handleClose = () => {
-    orca.nav.close(panelId)
+    // 跳转到今日笔记，然后关闭当前面板
+    orca.nav.goTo("journal", { date: new Date() }, panelId)
   }
 
   // 记录主面板 ID（复习面板左侧的面板）
