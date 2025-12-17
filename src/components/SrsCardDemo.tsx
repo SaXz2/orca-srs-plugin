@@ -138,7 +138,7 @@ function ReviewBlock({ blockId, panelId, fallback, hideChildren = false, readonl
         backgroundColor: "var(--orca-color-bg-0)",
         borderRadius: "6px",
         border: "1px solid var(--orca-color-border-1)",
-        ...(readonly ? { pointerEvents: 'none' as const, userSelect: 'none' as const, cursor: 'default' } : {})
+        ...(readonly ? { userSelect: 'none' as const, cursor: 'default' } : {})
       }}
     >
       {blockId && panelId ? (
