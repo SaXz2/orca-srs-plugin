@@ -13,8 +13,7 @@ import { makeAICardFromBlock } from "../ai/aiCardCreator"
 import { testAIConnection } from "../ai/aiService"
 
 export function registerCommands(
-  pluginName: string,
-  openFlashcardHome: () => Promise<void>
+  pluginName: string
 ): void {
   // 在闭包中捕获 pluginName，供 undo 函数使用
   const _pluginName = pluginName
@@ -26,15 +25,6 @@ export function registerCommands(
       scanCardsFromTags(_pluginName)
     },
     "SRS: 扫描带标签的卡片"
-  )
-
-  orca.commands.registerCommand(
-    `${pluginName}.openFlashcardHome`,
-    async () => {
-      console.log(`[${_pluginName}] 打开 Flashcard Home`)
-      await openFlashcardHome()
-    },
-    "SRS: 打开 Flashcard Home"
   )
 
   orca.commands.registerEditorCommand(
@@ -231,11 +221,21 @@ export function registerCommands(
     },
     "SRS: 打开旧复习面板"
   )
+
+  // 打开 Flash Home 命令
+  orca.commands.registerCommand(
+    `${pluginName}.openFlashcardHome`,
+    async () => {
+      console.log(`[${_pluginName}] 打开 Flash Home`)
+      const { openFlashcardHome } = await import("../../main")
+      await openFlashcardHome()
+    },
+    "SRS: 打开 Flash Home"
+  )
 }
 
 export function unregisterCommands(pluginName: string): void {
   orca.commands.unregisterCommand(`${pluginName}.scanCardsFromTags`)
-  orca.commands.unregisterCommand(`${pluginName}.openFlashcardHome`)
   orca.commands.unregisterEditorCommand(`${pluginName}.makeCardFromBlock`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createCloze`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createDirectionForward`)
@@ -245,4 +245,7 @@ export function unregisterCommands(pluginName: string): void {
   orca.commands.unregisterEditorCommand(`${pluginName}.makeAICard`)
   orca.commands.unregisterCommand(`${pluginName}.testAIConnection`)
   orca.commands.unregisterCommand(`${pluginName}.openOldReviewPanel`)
+  
+  // Flash Home 命令注销
+  orca.commands.unregisterCommand(`${pluginName}.openFlashcardHome`)
 }
