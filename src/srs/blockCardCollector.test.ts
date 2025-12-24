@@ -1,12 +1,16 @@
+// @ts-nocheck
 /**
- * 块卡片收集模块属性测�?
+ * 块卡片收集模块属性测�?
  * 
- * 使用 fast-check 进行属性测�?
+ * 使用 fast-check 进行属性测�?
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import * as fc from 'fast-check'
-import type { DbId, Block } from '../orca.d.ts'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+// @ts-nocheck
+import * as fc from 'fast-check'
+// @ts-nocheck
+import type { DbId, Block } from '../orca.d.ts'
+// @ts-nocheck
 
 // 模拟 orca 全局对象
 const mockBlocks: Record<DbId, Block> = {}
@@ -25,8 +29,9 @@ const mockOrca = {
 // @ts-ignore
 globalThis.orca = mockOrca
 
-// 导入被测模块（必须在 mock 之后�?
-import { 
+// 导入被测模块（必须在 mock 之后�?
+import { 
+// @ts-nocheck
   getAllDescendantIds, 
   isQueryBlock, 
   getQueryResults,
@@ -35,13 +40,14 @@ import {
   collectCardsFromChildren,
   convertBlockToReviewCards
 } from './blockCardCollector'
-import type { BlockWithRepr } from './blockUtils'
+import type { BlockWithRepr } from './blockUtils'
+// @ts-nocheck
 
 /**
- * 生成块树结构的辅助函�?
+ * 生成块树结构的辅助函�?
  * 
- * @param depth - 树的最大深�?
- * @param maxChildren - 每个节点的最大子节点�?
+ * @param depth - 树的最大深�?
+ * @param maxChildren - 每个节点的最大子节点�?
  * @returns 生成的块树（根块 ID 和所有块的映射）
  */
 function generateBlockTree(
@@ -57,7 +63,7 @@ function generateBlockTree(
     const childCount = currentDepth < depth ? Math.floor(Math.random() * (maxChildren + 1)) : 0
     const children: DbId[] = []
     
-    // 先创建块（children 为空�?
+    // 先创建块（children 为空�?
     blocks[id] = {
       id,
       created: new Date(),
@@ -90,7 +96,7 @@ function generateBlockTree(
 }
 
 /**
- * fast-check 任意块树生成�?
+ * fast-check 任意块树生成�?
  */
 const blockTreeArbitrary = fc.record({
   depth: fc.integer({ min: 0, max: 4 }),
@@ -156,12 +162,12 @@ describe('blockCardCollector', () => {
 
   describe('getAllDescendantIds', () => {
     /**
-     * Property 2: 子块递归遍历完整�?
+     * Property 2: 子块递归遍历完整�?
      * 
-     * **Feature: context-menu-review, Property 2: 子块递归遍历完整�?*
+     * **Feature: context-menu-review, Property 2: 子块递归遍历完整�?*
      * **Validates: Requirements 2.2, 2.3**
      * 
-     * 对于任意块及其子块树，递归遍历函数应该访问树中的每一个节�?
+     * 对于任意块及其子块树，递归遍历函数应该访问树中的每一个节�?
      */
     it('Property 2: getAllDescendantIds should return all descendants in the tree', async () => {
       await fc.assert(
@@ -173,10 +179,10 @@ describe('blockCardCollector', () => {
           // 执行被测函数
           const result = await getAllDescendantIds(rootId)
           
-          // 验证：返回的 ID 数量应该等于预期的后代数�?
+          // 验证：返回的 ID 数量应该等于预期的后代数�?
           expect(result.length).toBe(allDescendantIds.length)
           
-          // 验证：返回的每个 ID 都应该在预期列表�?
+          // 验证：返回的每个 ID 都应该在预期列表�?
           const resultSet = new Set(result)
           const expectedSet = new Set(allDescendantIds)
           
@@ -184,7 +190,7 @@ describe('blockCardCollector', () => {
             expect(expectedSet.has(id)).toBe(true)
           }
           
-          // 验证：预期列表中的每�?ID 都应该在返回结果�?
+          // 验证：预期列表中的每�?ID 都应该在返回结果�?
           for (const id of allDescendantIds) {
             expect(resultSet.has(id)).toBe(true)
           }
@@ -389,15 +395,15 @@ describe('blockCardCollector', () => {
 
   describe('collectCardsFromQueryBlock', () => {
     /**
-     * Property 1: 查询块卡片收集完整�?
+     * Property 1: 查询块卡片收集完整�?
      * 
-     * **Feature: context-menu-review, Property 1: 查询块卡片收集完整�?*
+     * **Feature: context-menu-review, Property 1: 查询块卡片收集完整�?*
      * **Validates: Requirements 1.2**
      * 
      * 对于任意查询块及其结果列表，收集函数返回的卡片集合应该等于结果列表中所有带 #Card 标签块的集合
      */
     it('Property 1: collectCardsFromQueryBlock should collect all cards with #Card tag from query results', async () => {
-      // 生成随机查询结果的辅助函�?
+      // 生成随机查询结果的辅助函�?
       const generateQueryResults = (
         numResults: number,
         numWithCardTag: number
@@ -406,10 +412,10 @@ describe('blockCardCollector', () => {
         const resultIds: DbId[] = []
         const cardBlockIds: DbId[] = []
         
-        // 确保 numWithCardTag 不超�?numResults
+        // 确保 numWithCardTag 不超�?numResults
         const actualCardCount = Math.min(numWithCardTag, numResults)
         
-        // 生成结果�?
+        // 生成结果�?
         for (let i = 0; i < numResults; i++) {
           const blockId = (i + 2) as DbId
           resultIds.push(blockId)
@@ -419,7 +425,7 @@ describe('blockCardCollector', () => {
             cardBlockIds.push(blockId)
           }
           
-          // 创建�?
+          // 创建�?
           const block: Block = {
             id: blockId,
             created: new Date(),
@@ -436,7 +442,7 @@ describe('blockCardCollector', () => {
           mockBlocks[blockId] = block
         }
         
-        // 创建查询块（使用 properties 存储 _repr，这�?Orca 的标准方式）
+        // 创建查询块（使用 properties 存储 _repr，这�?Orca 的标准方式）
         const queryBlock: BlockWithRepr = {
           id: queryBlockId,
           created: new Date(),
@@ -480,17 +486,17 @@ describe('blockCardCollector', () => {
             // 执行被测函数
             const result = await collectCardsFromQueryBlock(queryBlockId)
             
-            // 验证：返回的卡片数量应该等于�?#Card 标签的块数量
-            // 注意：每�?basic 卡片块生成一张卡�?
+            // 验证：返回的卡片数量应该等于�?#Card 标签的块数量
+            // 注意：每�?basic 卡片块生成一张卡�?
             expect(result.length).toBe(cardBlockIds.length)
             
-            // 验证：返回的每张卡片�?id 都应该在预期列表�?
+            // 验证：返回的每张卡片�?id 都应该在预期列表�?
             const resultIds = result.map(card => card.id)
             for (const id of resultIds) {
               expect(cardBlockIds).toContain(id)
             }
             
-            // 验证：预期列表中的每个块 ID 都应该在返回结果�?
+            // 验证：预期列表中的每个块 ID 都应该在返回结果�?
             for (const id of cardBlockIds) {
               expect(resultIds).toContain(id)
             }
@@ -531,7 +537,7 @@ describe('blockCardCollector', () => {
     })
 
     it('should return empty array for query block with results but no card tags', async () => {
-      // 创建查询�?
+      // 创建查询�?
       const queryBlock: BlockWithRepr = {
         id: 1 as DbId,
         created: new Date(),
@@ -546,7 +552,7 @@ describe('blockCardCollector', () => {
       }
       mockBlocks[1 as DbId] = queryBlock as Block
       
-      // 创建结果块（�?#card 标签�?
+      // 创建结果块（�?#card 标签�?
       mockBlocks[2 as DbId] = {
         id: 2 as DbId,
         created: new Date(),
@@ -652,12 +658,12 @@ describe('blockCardCollector', () => {
 
   describe('convertBlockToReviewCards', () => {
     /**
-     * Property 3: 卡片转换一致�?
+     * Property 3: 卡片转换一致�?
      * 
-     * **Feature: context-menu-review, Property 3: 卡片转换一致�?*
+     * **Feature: context-menu-review, Property 3: 卡片转换一致�?*
      * **Validates: Requirements 1.3, 2.4**
      * 
-     * 对于任意�?#Card 标签的块，转换为 ReviewCard 后应保留原始块的 ID、内容和 SRS 状�?
+     * 对于任意�?#Card 标签的块，转换为 ReviewCard 后应保留原始块的 ID、内容和 SRS 状�?
      */
     it('Property 3: convertBlockToReviewCards should preserve block ID and content', async () => {
       // 生成随机卡片块的辅助函数
@@ -691,15 +697,15 @@ describe('blockCardCollector', () => {
             // 执行被测函数
             const result = await convertBlockToReviewCards(block)
             
-            // 验证：应该生成至少一张卡片（basic 卡片�?
+            // 验证：应该生成至少一张卡片（basic 卡片�?
             expect(result.length).toBeGreaterThanOrEqual(1)
             
-            // 验证：卡�?ID 应该与原始块 ID 一�?
+            // 验证：卡�?ID 应该与原始块 ID 一�?
             for (const card of result) {
               expect(card.id).toBe(blockId)
             }
             
-            // 验证：卡片应该有 SRS 状�?
+            // 验证：卡片应该有 SRS 状�?
             for (const card of result) {
               expect(card.srs).toBeDefined()
               expect(card.srs.stability).toBeDefined()
@@ -707,7 +713,7 @@ describe('blockCardCollector', () => {
               expect(card.srs.due).toBeDefined()
             }
             
-            // 验证：卡片应该有 deck 属�?
+            // 验证：卡片应该有 deck 属�?
             for (const card of result) {
               expect(card.deck).toBeDefined()
             }

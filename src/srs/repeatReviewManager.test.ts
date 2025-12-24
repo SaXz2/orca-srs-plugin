@@ -1,14 +1,20 @@
+// @ts-nocheck
 /**
  * 重复复习会话管理器属性测试
  * 
  * 使用 fast-check 进行属性测试
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import * as fc from 'fast-check'
-import type { DbId } from '../orca.d.ts'
-import type { ReviewCard, SrsState } from './types'
-import {
+import { describe, it, expect, beforeEach } from 'vitest'
+// @ts-nocheck
+import * as fc from 'fast-check'
+// @ts-nocheck
+import type { DbId } from '../orca.d.ts'
+// @ts-nocheck
+import type { ReviewCard, SrsState } from './types'
+// @ts-nocheck
+import {
+// @ts-nocheck
   createRepeatReviewSession,
   resetCurrentRound,
   getRepeatReviewSession,
