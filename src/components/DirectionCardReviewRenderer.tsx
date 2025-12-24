@@ -7,7 +7,7 @@
  * - 反向：右边是问题，左边是答案
  */
 
-const { useState, useMemo } = window.React
+const { useState, useMemo, useRef, useEffect } = window.React
 const { useSnapshot } = window.Valtio
 const { Button } = orca.components
 
@@ -83,6 +83,19 @@ export default function DirectionCardReviewRenderer({
 }: DirectionCardReviewRendererProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [showCardInfo, setShowCardInfo] = useState(false)
+
+  // 用于追踪上一个卡片的唯一标识，检测卡片切换
+  const prevCardKeyRef = useRef<string>("")
+  const currentCardKey = `${blockId}-${reviewDirection}`
+
+  // 当卡片变化时重置状态
+  useEffect(() => {
+    if (prevCardKeyRef.current !== currentCardKey) {
+      setShowAnswer(false)
+      setShowCardInfo(false)
+      prevCardKeyRef.current = currentCardKey
+    }
+  }, [currentCardKey])
 
   const snapshot = useSnapshot(orca.state)
   const block = useMemo(() => {
@@ -427,7 +440,21 @@ export default function DirectionCardReviewRenderer({
 
       {/* 显示答案 / 评分按钮 */}
       {!showAnswer ? (
-        <div style={{ textAlign: "center", marginBottom: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginBottom: "12px" }}>
+          {/* 跳过按钮 - 在答案未显示时也可用 */}
+          {onSkip && (
+            <Button
+              variant="outline"
+              onClick={onSkip}
+              title="跳过当前卡片，不评分"
+              style={{
+                padding: "12px 24px",
+                fontSize: "16px",
+              }}
+            >
+              跳过
+            </Button>
+          )}
           <Button
             variant="solid"
             onClick={() => setShowAnswer(true)}

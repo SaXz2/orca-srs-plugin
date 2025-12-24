@@ -327,17 +327,19 @@ export default function SrsCardDemo({
   const [showAnswer, setShowAnswer] = useState(false)
   const [showCardInfo, setShowCardInfo] = useState(false)
   
-  // 用于追踪上一个 blockId，检测卡片切换
-  const prevBlockIdRef = useRef<DbId | undefined>(blockId)
+  // 用于追踪上一个卡片的唯一标识，检测卡片切换
+  // 需要同时考虑 blockId、clozeNumber 和 directionType
+  const prevCardKeyRef = useRef<string>("")
+  const currentCardKey = `${blockId}-${clozeNumber ?? 0}-${directionType ?? "basic"}`
 
-  // 当 blockId 变化时重置状态，防止闪烁
+  // 当卡片变化时重置状态，防止闪烁
   useEffect(() => {
-    if (prevBlockIdRef.current !== blockId) {
+    if (prevCardKeyRef.current !== currentCardKey) {
       setShowAnswer(false)
       setShowCardInfo(false)
-      prevBlockIdRef.current = blockId
+      prevCardKeyRef.current = currentCardKey
     }
-  }, [blockId])
+  }, [currentCardKey])
 
   // 订阅 orca.state，Valtio 会自动追踪实际访问的属性
   const snapshot = useSnapshot(orca.state)
@@ -1114,8 +1116,22 @@ export default function SrsCardDemo({
           </div>
         </>
       ) : (
-        // 有子块但未显示答案：显示"显示答案"按钮
-        <div contentEditable={false} style={{ textAlign: "center", marginBottom: "12px" }}>
+        // 有子块但未显示答案：显示"显示答案"按钮和跳过按钮
+        <div contentEditable={false} style={{ display: "flex", justifyContent: "center", gap: "12px", marginBottom: "12px" }}>
+          {/* 跳过按钮 - 在答案未显示时也可用 */}
+          {onSkip && (
+            <Button
+              variant="outline"
+              onClick={onSkip}
+              title="跳过当前卡片，不评分"
+              style={{
+                padding: "12px 24px",
+                fontSize: "16px"
+              }}
+            >
+              跳过
+            </Button>
+          )}
           <Button
             variant="solid"
             onClick={() => setShowAnswer(true)}

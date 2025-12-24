@@ -7,7 +7,7 @@
  */
 
 // 从全局 window 对象获取 React 与 Valtio（Orca 插件约定）
-const { useState, useMemo } = window.React
+const { useState, useMemo, useRef, useEffect } = window.React
 const { useSnapshot } = window.Valtio
 const { Button, ModalOverlay } = orca.components
 
@@ -162,6 +162,19 @@ export default function ClozeCardReviewRenderer({
 }: ClozeCardReviewRendererProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [showCardInfo, setShowCardInfo] = useState(false)
+
+  // 用于追踪上一个卡片的唯一标识，检测卡片切换
+  const prevCardKeyRef = useRef<string>("")
+  const currentCardKey = `${blockId}-${clozeNumber ?? 0}`
+
+  // 当卡片变化时重置状态
+  useEffect(() => {
+    if (prevCardKeyRef.current !== currentCardKey) {
+      setShowAnswer(false)
+      setShowCardInfo(false)
+      prevCardKeyRef.current = currentCardKey
+    }
+  }, [currentCardKey])
 
   // 订阅 orca.state，Valtio 会自动追踪实际访问的属性
   const snapshot = useSnapshot(orca.state)
@@ -406,7 +419,21 @@ export default function ClozeCardReviewRenderer({
 
       {/* 显示答案按钮 / 评分按钮 */}
       {!showAnswer ? (
-        <div style={{ textAlign: "center", marginBottom: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginBottom: "12px" }}>
+          {/* 跳过按钮 - 在答案未显示时也可用 */}
+          {onSkip && (
+            <Button
+              variant="outline"
+              onClick={onSkip}
+              title="跳过当前卡片，不评分"
+              style={{
+                padding: "12px 24px",
+                fontSize: "16px"
+              }}
+            >
+              跳过
+            </Button>
+          )}
           <Button
             variant="solid"
             onClick={() => setShowAnswer(true)}

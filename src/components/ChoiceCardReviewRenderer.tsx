@@ -11,7 +11,7 @@
  * Requirements: 3.1, 3.7, 3.8, 3.9, 3.10
  */
 
-const { useState, useMemo, useCallback } = window.React
+const { useState, useMemo, useCallback, useRef, useEffect } = window.React
 const { useSnapshot } = window.Valtio
 const { Button } = orca.components
 
@@ -94,6 +94,21 @@ export default function ChoiceCardReviewRenderer({
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)
   const [showCardInfo, setShowCardInfo] = useState(false)
   const [currentSuggestedGrade, setCurrentSuggestedGrade] = useState<Grade | null>(null)
+
+  // 用于追踪上一个卡片的唯一标识，检测卡片切换
+  const prevCardKeyRef = useRef<string>("")
+  const currentCardKey = `${blockId}`
+
+  // 当卡片变化时重置状态
+  useEffect(() => {
+    if (prevCardKeyRef.current !== currentCardKey) {
+      setSelectedIds(new Set())
+      setIsAnswerRevealed(false)
+      setShowCardInfo(false)
+      setCurrentSuggestedGrade(null)
+      prevCardKeyRef.current = currentCardKey
+    }
+  }, [currentCardKey])
 
   // 订阅 orca.state
   const snapshot = useSnapshot(orca.state)
@@ -419,7 +434,26 @@ export default function ChoiceCardReviewRenderer({
 
       {/* 多选模式提交按钮 */}
       {mode === "multiple" && !isAnswerRevealed && (
-        <div style={{ textAlign: "center", marginBottom: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginBottom: "12px" }}>
+          {/* 跳过按钮 - 在答案未揭晓时也可用 */}
+          {onSkip && (
+            <button
+              onClick={onSkip}
+              title="跳过当前卡片，不评分"
+              style={{
+                padding: "12px 24px",
+                fontSize: "16px",
+                backgroundColor: "transparent",
+                color: "var(--orca-color-text-2)",
+                border: "1px solid var(--orca-color-border-2)",
+                borderRadius: "8px",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              跳过
+            </button>
+          )}
           <button
             onClick={handleSubmit}
             style={{
@@ -436,13 +470,28 @@ export default function ChoiceCardReviewRenderer({
           >
             提交答案
           </button>
-          <div style={{ 
-            marginTop: "8px", 
-            fontSize: "12px", 
-            color: "var(--orca-color-text-3)" 
-          }}>
-            已选择 {selectedIds.size} 项 · 按 Enter 提交
-          </div>
+        </div>
+      )}
+
+      {/* 单选模式跳过按钮（答案未揭晓时显示） */}
+      {mode !== "multiple" && !isAnswerRevealed && onSkip && (
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+          <button
+            onClick={onSkip}
+            title="跳过当前卡片，不评分"
+            style={{
+              padding: "12px 24px",
+              fontSize: "16px",
+              backgroundColor: "transparent",
+              color: "var(--orca-color-text-2)",
+              border: "1px solid var(--orca-color-border-2)",
+              borderRadius: "8px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            跳过
+          </button>
         </div>
       )}
 
