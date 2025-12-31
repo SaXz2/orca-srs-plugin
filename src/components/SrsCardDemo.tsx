@@ -538,7 +538,7 @@ export default function SrsCardDemo({
     return previewDueDates(fullState);
   }, [srsInfo]);
 
-  // 如果块已被删除，显示友好提示
+  // 块数据可能只是尚未加载；不要误判为“已删除”并要求用户手动跳过
   if (blockId && !questionBlock) {
     return (
       <div
@@ -550,24 +550,9 @@ export default function SrsCardDemo({
           color: "var(--orca-color-text-2)",
         }}
       >
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>🗑️</div>
-        <div style={{ fontSize: "16px", marginBottom: "8px" }}>
-          该卡片已被删除
-        </div>
-        <div style={{ fontSize: "14px", opacity: 0.7 }}>
-          请跳过此卡片继续复习
-        </div>
-        {onSkip && (
-          <Button
-            variant="outline"
-            onClick={onSkip}
-            style={{ marginTop: "16px" }}
-          >
-            跳过
-          </Button>
-        )}
+        <div style={{ fontSize: "14px", opacity: 0.75 }}>卡片加载中...</div>
       </div>
-    );
+    )
   }
 
   // 如果是 cloze 卡片，使用专门的 Cloze 渲染器

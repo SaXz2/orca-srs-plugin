@@ -52,10 +52,6 @@ export async function createListCardFromBlock(
   }
 
   const childIds = (block.children ?? []) as DbId[]
-  if (childIds.length < 2) {
-    orca.notify("error", "列表卡需要至少 2 条条目（子块）", { title: "列表卡" })
-    return null
-  }
 
   // 添加/更新 #card 标签，type=list
   const hasCardTag = block.refs?.some(ref => ref.type === 2 && isCardTag(ref.alias))
@@ -124,7 +120,10 @@ export async function createListCardFromBlock(
     }
   }
 
-  orca.notify("success", "已创建列表卡（评分将逐条解锁下一条）", { title: "列表卡" })
+  if (childIds.length === 0) {
+    orca.notify("success", "已创建列表卡，请在该块下添加子块作为条目", { title: "列表卡" })
+  } else {
+    orca.notify("success", "已创建列表卡（评分将逐条解锁下一条）", { title: "列表卡" })
+  }
   return { blockId }
 }
-

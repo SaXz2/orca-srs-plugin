@@ -144,13 +144,7 @@ export default function ListCardReviewRenderer({
         textAlign: "center",
         color: "var(--orca-color-text-2)"
       }}>
-        <div style={{ fontSize: "16px", marginBottom: "8px" }}>列表卡已被删除或未加载</div>
-        <div style={{ fontSize: "14px", opacity: 0.7 }}>请跳过此卡片继续复习</div>
-        {onSkip && (
-          <Button variant="outline" onClick={onSkip} style={{ marginTop: "16px" }}>
-            跳过
-          </Button>
-        )}
+        <div style={{ fontSize: "14px", opacity: 0.75 }}>列表卡加载中...</div>
       </div>
     )
   }

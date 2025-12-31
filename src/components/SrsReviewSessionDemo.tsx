@@ -28,6 +28,7 @@ import GradeDistributionBar from "./GradeDistributionBar"
 
 // 从全局 window 对象获取 React（Orca 插件约定）
 const { useEffect, useMemo, useRef, useState } = window.React
+const { useSnapshot } = window.Valtio
 const { Button, ModalOverlay } = orca.components
 
 type SrsReviewSessionProps = {
@@ -246,6 +247,95 @@ export default function SrsReviewSession({
   // 这样当新卡片动态添加到队列末尾时，不会错误地显示完成界面
   const isSessionComplete = currentIndex >= totalCards && totalCards > 0
 
+  // 订阅当前卡片相关的块，便于在“块被删除/卸载”时触发自动剔除逻辑
+  const snapshot = useSnapshot(orca.state)
+  const currentCardBlock = currentCard ? snapshot?.blocks?.[currentCard.id] : null
+  const currentListItemBlock = currentCard?.listItemId
+    ? snapshot?.blocks?.[currentCard.listItemId]
+    : null
+
+  /**
+   * 确保当前卡片相关的块已加载
+   * - 如果只是未加载：尝试从后端拉取并写入 orca.state.blocks，避免被误判为“已删除”
+   * - 如果确实不存在（被删除）：从队列中剔除，不再推送到复习界面
+   */
+  const autoDroppedCardKeysRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!currentCard) return
+
+    const currentCardKey = getReviewCardKey(currentCard)
+    if (autoDroppedCardKeysRef.current.has(currentCardKey)) {
+      return
+    }
+
+    let cancelled = false
+
+    const ensureBlockLoaded = async (id: DbId): Promise<boolean> => {
+      const existing = orca.state.blocks?.[id]
+      if (existing) return true
+
+      try {
+        const fetched = await orca.invokeBackend("get-block", id)
+        if (cancelled) return false
+        if (!fetched) return false
+
+        // 将拉取到的块写回 state，供各渲染器复用
+        const stateAny = orca.state as any
+        if (!stateAny.blocks) stateAny.blocks = {}
+        stateAny.blocks[id] = fetched
+        return true
+      } catch (e) {
+        console.warn(`[${pluginName}] 拉取块失败: ${id}`, e)
+        return false
+      }
+    }
+
+    void (async () => {
+      const requiredIds: DbId[] = [currentCard.id]
+      if (currentCard.listItemId) {
+        requiredIds.push(currentCard.listItemId)
+      }
+
+      for (const id of requiredIds) {
+        const ok = await ensureBlockLoaded(id)
+        if (cancelled) return
+        if (!ok) {
+          autoDroppedCardKeysRef.current.add(currentCardKey)
+          console.log(`[${pluginName}] 卡片对应块不存在，自动剔除: ${currentCardKey}`)
+
+          // 从队列中移除当前卡片，让下一张卡片顶上来（不要求用户手动“跳过”）
+          setQueue((prevQueue: ReviewCard[]) => {
+            if (currentIndex < 0 || currentIndex >= prevQueue.length) return prevQueue
+            const keyAtIndex = getReviewCardKey(prevQueue[currentIndex]!)
+            if (keyAtIndex !== currentCardKey) return prevQueue
+            return [...prevQueue.slice(0, currentIndex), ...prevQueue.slice(currentIndex + 1)]
+          })
+
+          // 修正历史索引，避免“回到上一张”错位
+          setHistory((prev: number[]) =>
+            prev
+              .filter((i: number) => i !== currentIndex)
+              .map((i: number) => (i > currentIndex ? i - 1 : i))
+          )
+
+          setLastLog("已自动跳过不存在的卡片")
+          return
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    currentCard?.id,
+    currentCard?.listItemId,
+    currentIndex,
+    pluginName,
+    currentCardBlock,
+    currentListItemBlock
+  ])
+
   // 预缓存下一张卡片的块数据，防止切换时闪烁
   useEffect(() => {
     if (nextCard?.id) {
@@ -254,7 +344,18 @@ export default function SrsReviewSession({
       const block = orca.state.blocks?.[nextCard.id]
       if (!block) {
         // 如果块数据不存在，尝试通过 API 预加载
-        console.log(`[SRS Review Session] 预缓存下一张卡片: ${nextCard.id}`)
+        void (async () => {
+          try {
+            const fetched = await orca.invokeBackend("get-block", nextCard.id)
+            if (!fetched) return
+            const stateAny = orca.state as any
+            if (!stateAny.blocks) stateAny.blocks = {}
+            stateAny.blocks[nextCard.id] = fetched
+            console.log(`[SRS Review Session] 已预缓存下一张卡片: ${nextCard.id}`)
+          } catch (e) {
+            console.warn(`[SRS Review Session] 预缓存失败: ${nextCard.id}`, e)
+          }
+        })()
       }
     }
   }, [nextCard?.id])

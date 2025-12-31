@@ -158,7 +158,7 @@ export default function DirectionCardReviewRenderer({
     return previewDueDates(fullState)
   }, [srsInfo])
 
-  // 如果块已被删除，显示友好提示
+  // 块数据可能只是尚未加载；不要误判为“已删除”
   if (!block) {
     return (
       <div style={{
@@ -168,18 +168,7 @@ export default function DirectionCardReviewRenderer({
         textAlign: "center",
         color: "var(--orca-color-text-2)"
       }}>
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>🗑️</div>
-        <div style={{ fontSize: "16px", marginBottom: "8px" }}>该卡片已被删除</div>
-        <div style={{ fontSize: "14px", opacity: 0.7 }}>请跳过此卡片继续复习</div>
-        {onSkip && (
-          <Button
-            variant="outline"
-            onClick={onSkip}
-            style={{ marginTop: "16px" }}
-          >
-            跳过
-          </Button>
-        )}
+        <div style={{ fontSize: "14px", opacity: 0.75 }}>卡片加载中...</div>
       </div>
     )
   }
