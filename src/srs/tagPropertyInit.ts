@@ -29,12 +29,16 @@ const PropType = {
   TextChoices: 6
 } as const
 
+const PRIORITY_CHOICES = ["高优先级", "中优先级", "低优先级"] as const
+const DEFAULT_PRIORITY_CHOICE = "中优先级"
+
 /**
  * card 标签需要的属性定义
  * 
  * 根据 Orca 的标签属性系统：
  * - type 和 status 使用"文本"类型（PropType.Text = 1）
  * - 牌组 使用"块引用"类型（PropType.BlockRefs = 2）
+ * - priority 使用"单选文本"类型（PropType.TextChoices = 6）
  * - 值留空，用户可后续在 UI 中选择/输入
  */
 const CARD_TAG_PROPERTY_DEFINITIONS: BlockProperty[] = [
@@ -53,6 +57,12 @@ const CARD_TAG_PROPERTY_DEFINITIONS: BlockProperty[] = [
     name: "status",
     type: PropType.Text,  // 文本类型
     value: ""  // 留空
+  },
+  {
+    name: "priority",
+    type: PropType.TextChoices,  // 单选文本类型
+    typeArgs: { choices: PRIORITY_CHOICES },
+    value: [DEFAULT_PRIORITY_CHOICE]
   }
 ]
 

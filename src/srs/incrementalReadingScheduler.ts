@@ -4,7 +4,15 @@
  * 根据静态优先级映射到固定间隔天数，计算下一次到期时间。
  */
 
+import type { Block } from "../orca.d.ts"
+import { isCardTag } from "./tagUtils"
+
 const DEFAULT_PRIORITY = 5
+const PRIORITY_PROPERTY_NAME = "priority"
+const PRIORITY_CHOICES = ["高优先级", "中优先级", "低优先级"] as const
+const DEFAULT_PRIORITY_CHOICE: IRPriorityChoice = "中优先级"
+
+export type IRPriorityChoice = typeof PRIORITY_CHOICES[number]
 
 /**
  * 规范化优先级到 1-10
@@ -37,13 +45,73 @@ export function getIntervalDays(priority: number): number {
   return 7
 }
 
+const normalizePriorityChoice = (value: unknown): IRPriorityChoice | null => {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return PRIORITY_CHOICES.includes(trimmed as IRPriorityChoice)
+    ? (trimmed as IRPriorityChoice)
+    : null
+}
+
+/**
+ * 从块的 #card 标签中提取 priority 单选属性
+ * 
+ * 返回值仅限：高优先级/中优先级/低优先级
+ */
+export function getPriorityFromTag(block: Block): IRPriorityChoice | null {
+  if (!block.refs || block.refs.length === 0) {
+    return null
+  }
+
+  const cardRef = block.refs.find(ref =>
+    ref.type === 2 && isCardTag(ref.alias)
+  )
+  if (!cardRef?.data || cardRef.data.length === 0) {
+    return null
+  }
+
+  const priorityProp = cardRef.data.find(data => data.name === PRIORITY_PROPERTY_NAME)
+  if (!priorityProp) {
+    return null
+  }
+
+  const rawValue = priorityProp.value
+  if (Array.isArray(rawValue)) {
+    return normalizePriorityChoice(rawValue[0])
+  }
+  return normalizePriorityChoice(rawValue)
+}
+
+const randomIntInclusive = (min: number, max: number): number =>
+  Math.floor(Math.random() * (max - min + 1)) + min
+
+/**
+ * 根据优先级区间随机生成间隔天数，避免同日堆积
+ *
+ * - 高优先级：1-2 天
+ * - 中优先级：3-5 天
+ * - 低优先级：7-10 天
+ */
+export function getRandomIntervalDays(priority: IRPriorityChoice | string): number {
+  const normalized = normalizePriorityChoice(priority) ?? DEFAULT_PRIORITY_CHOICE
+
+  if (normalized === "高优先级") return randomIntInclusive(1, 2)
+  if (normalized === "中优先级") return randomIntInclusive(3, 5)
+  return randomIntInclusive(7, 10)
+}
+
 /**
  * 计算下一次到期时间
  * @param priority - 优先级
  * @param baseDate - 基准时间（通常为当前时间或上次阅读时间）
  */
-export function calculateNextDue(priority: number, baseDate: Date = new Date()): Date {
-  const intervalDays = getIntervalDays(priority)
+export function calculateNextDue(
+  priority: number | IRPriorityChoice,
+  baseDate: Date = new Date()
+): Date {
+  const intervalDays = typeof priority === "number"
+    ? getIntervalDays(priority)
+    : getRandomIntervalDays(priority)
   const next = new Date(baseDate.getTime())
   next.setDate(next.getDate() + intervalDays)
   return next

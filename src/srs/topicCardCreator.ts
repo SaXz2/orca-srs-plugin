@@ -12,6 +12,8 @@ import { ensureIRState } from "./incrementalReadingStorage"
 import { ensureCardTagProperties } from "./tagPropertyInit"
 import { isCardTag } from "./tagUtils"
 
+const DEFAULT_PRIORITY_CHOICE = "中优先级"
+
 export async function createTopicCard(
   cursor: CursorData,
   pluginName: string
@@ -41,18 +43,25 @@ export async function createTopicCard(
         [
           { name: "type", value: "topic" },
           { name: "牌组", value: [] },
-          { name: "status", value: "" }
+          { name: "status", value: "" },
+          { name: "priority", value: [DEFAULT_PRIORITY_CHOICE] }
         ]
       )
       await ensureCardTagProperties(pluginName)
     } else {
       const cardRef = block.refs?.find(ref => ref.type === 2 && isCardTag(ref.alias))
       if (cardRef) {
+        // 仅补齐缺失的 priority，避免覆盖用户已有选择
+        const hasPriority = cardRef.data?.some(data => data.name === "priority") ?? false
+        const refData: Array<{ name: string; value: any }> = [{ name: "type", value: "topic" }]
+        if (!hasPriority) {
+          refData.push({ name: "priority", value: [DEFAULT_PRIORITY_CHOICE] })
+        }
         await orca.commands.invokeEditorCommand(
           "core.editor.setRefData",
           null,
           cardRef,
-          [{ name: "type", value: "topic" }]
+          refData
         )
       }
     }

@@ -11,7 +11,9 @@
 
 import type { Block, DbId } from "../orca.d.ts"
 import { extractCardType } from "./deckUtils"
-import { isCardTag } from "./tagUtils"
+import { calculateNextDue, getPriorityFromTag } from "./incrementalReadingScheduler"
+
+const DEFAULT_PRIORITY_CHOICE = "中优先级"
 
 /**
  * 判断块是否为渐进阅读 Topic
@@ -40,10 +42,10 @@ function isAlreadyExtract(block: Block): boolean {
 }
 
 /**
- * 检查块的父块是否是渐进阅读Topic
+ * 查找块的父级 Topic（若存在）
  */
-function isChildOfTopic(blockId: DbId): boolean {
-  // 遍历所有块，找到包含该blockId作为子块的父块
+function findParentTopic(blockId: DbId): Block | null {
+  // 遍历所有块，找到包含该 blockId 作为子块的父块
   const allBlocks = orca.state.blocks as Record<number, Block | undefined>
 
   for (const block of Object.values(allBlocks)) {
@@ -52,11 +54,13 @@ function isChildOfTopic(blockId: DbId): boolean {
     // 如果这个块的children包含当前blockId
     if (block.children.includes(blockId)) {
       // 检查父块是否是Topic
-      return isIncrementalReadingTopic(block)
+      if (isIncrementalReadingTopic(block)) {
+        return block
+      }
     }
   }
 
-  return false
+  return null
 }
 
 /**
@@ -80,10 +84,13 @@ async function autoMarkAsExtract(blockId: DbId, pluginName: string): Promise<voi
   }
 
   // 检查父块是否是Topic
-  if (!isChildOfTopic(blockId)) {
+  const parentTopic = findParentTopic(blockId)
+  if (!parentTopic) {
     return
   }
 
+  // Extract 继承父 Topic 的 priority，用于初始排期
+  const inheritedPriority = getPriorityFromTag(parentTopic) ?? DEFAULT_PRIORITY_CHOICE
   console.log(`[${pluginName}] 自动标记 Extract: 块 ${blockId}`)
 
   try {
@@ -96,7 +103,8 @@ async function autoMarkAsExtract(blockId: DbId, pluginName: string): Promise<voi
       [
         { name: "type", value: "extracts" },
         { name: "牌组", value: [] },
-        { name: "status", value: "" }
+        { name: "status", value: "" },
+        { name: "priority", value: [inheritedPriority] }
       ]
     )
 
@@ -122,8 +130,19 @@ async function autoMarkAsExtract(blockId: DbId, pluginName: string): Promise<voi
     await ensureCardSrsState(blockId)
 
     // 初始化渐进阅读状态（ir.*）
-    const { ensureIRState } = await import("./incrementalReadingStorage")
-    await ensureIRState(blockId)
+    const { ensureIRState, invalidateIrBlockCache } = await import("./incrementalReadingStorage")
+    const state = await ensureIRState(blockId)
+    const baseDate = state.lastRead ?? new Date()
+    // 使用随机区间重算 due，避免同日堆积
+    const nextDue = calculateNextDue(inheritedPriority, baseDate)
+
+    await orca.commands.invokeEditorCommand(
+      "core.editor.setProperties",
+      null,
+      [blockId],
+      [{ name: "ir.due", value: nextDue, type: 5 }]
+    )
+    invalidateIrBlockCache(blockId)
 
     processedBlocks.add(blockId)
     console.log(`[${pluginName}] 自动标记完成: 块 ${blockId}`)
