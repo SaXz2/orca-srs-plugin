@@ -97,6 +97,13 @@ export function registerUIComponents(pluginName: string): void {
 
   // ============ 渐进阅读斜杠命令 ============
 
+  orca.slashCommands.registerSlashCommand(`${pluginName}.ir`, {
+    icon: "ti ti-book-2",
+    group: "SRS",
+    title: "IR：创建 Topic 卡片",
+    command: `${pluginName}.createTopicCard`
+  })
+
   orca.slashCommands.registerSlashCommand(`${pluginName}.incrementalReading`, {
     icon: "ti ti-book-2",
     group: "SRS",
@@ -120,5 +127,6 @@ export function unregisterUIComponents(pluginName: string): void {
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.directionForward`)
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.directionBackward`)
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.aiCard`)
+  orca.slashCommands.unregisterSlashCommand(`${pluginName}.ir`)
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.incrementalReading`)
 }

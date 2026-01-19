@@ -47,7 +47,7 @@ describe("collectAllIRCardsFromBlocks", () => {
     const now = new Date("2026-01-19T00:00:00Z")
     const blocks: Block[] = [
       createBlock(1, "extracts"),
-      createBlock(2, "渐进阅读"),
+      createBlock(2, "topic"),
       createBlock(3, "basic")
     ]
 

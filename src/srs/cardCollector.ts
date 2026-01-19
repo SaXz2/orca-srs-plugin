@@ -171,8 +171,8 @@ export async function collectReviewCards(pluginName: string = "srs-plugin"): Pro
     // 识别卡片类型
     const cardType = extractCardType(block)
 
-    // 渐进阅读卡片不进入 SRS 复习队列
-    if (cardType === "extracts" || cardType === "渐进阅读") {
+    // 渐进阅读主题/摘录卡片不进入 SRS 复习队列
+    if (cardType === "extracts" || cardType === "topic") {
       continue
     }
     const deckName = await extractDeckName(block)

@@ -9,7 +9,7 @@ import { extractCardType } from "./deckUtils"
 import { isCardTag } from "./tagUtils"
 import { ensureIRState, loadIRState } from "./incrementalReadingStorage"
 
-export type IRCardType = "渐进阅读" | "extracts"
+export type IRCardType = "topic" | "extracts"
 
 export type IRCard = {
   id: DbId
@@ -75,7 +75,7 @@ export async function collectIRCardsFromBlocks(
 
   for (const block of blocks) {
     const cardType = extractCardType(block)
-    if (cardType !== "渐进阅读" && cardType !== "extracts") continue
+    if (cardType !== "topic" && cardType !== "extracts") continue
 
     try {
       await ensureIRState(block.id)
@@ -112,7 +112,7 @@ export async function collectAllIRCardsFromBlocks(
 
   for (const block of blocks) {
     const cardType = extractCardType(block)
-    if (cardType !== "渐进阅读" && cardType !== "extracts") continue
+    if (cardType !== "topic" && cardType !== "extracts") continue
 
     try {
       await ensureIRState(block.id)
@@ -166,7 +166,7 @@ export async function collectAllIRCards(pluginName: string = "srs-plugin"): Prom
 
 function compareCardType(a: IRCardType, b: IRCardType): number {
   if (a === b) return 0
-  if (a === "渐进阅读") return -1
+  if (a === "topic") return -1
   return 1
 }
 

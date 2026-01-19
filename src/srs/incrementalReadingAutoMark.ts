@@ -18,11 +18,11 @@ import { isCardTag } from "./tagUtils"
  *
  * 判断条件：
  * - 必须有 #card 标签
- * - type 属性必须为 "渐进阅读"
+ * - type 属性必须为 "topic"
  */
 function isIncrementalReadingTopic(block: Block): boolean {
   const cardType = extractCardType(block)
-  return cardType === "渐进阅读"
+  return cardType === "topic"
 }
 
 // 记录已处理的块，避免重复标记

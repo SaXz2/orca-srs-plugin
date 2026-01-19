@@ -16,9 +16,9 @@ export type Grade = "again" | "hard" | "good" | "easy"
  * - excerpt: 摘录卡片
  * - choice: 选择题卡片
  * - extracts: 渐进阅读摘录卡片
- * - 渐进阅读: 渐进阅读主题卡片
+ * - topic: 渐进阅读主题卡片
  */
-export type CardType = "basic" | "cloze" | "direction" | "list" | "excerpt" | "choice" | "extracts" | "渐进阅读"
+export type CardType = "basic" | "cloze" | "direction" | "list" | "excerpt" | "choice" | "extracts" | "topic"
 
 // ============================================
 // 选择题卡片相关类型 (Choice Card)

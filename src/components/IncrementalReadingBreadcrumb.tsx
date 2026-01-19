@@ -25,7 +25,7 @@ async function findTopicPath(blockId: DbId, maxDepth: number): Promise<Breadcrum
 
     path.unshift({ id: block.id, text: block.text || "(无标题)" })
 
-    if (extractCardType(block) === "渐进阅读") {
+    if (extractCardType(block) === "topic") {
       break
     }
 

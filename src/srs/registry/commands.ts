@@ -10,8 +10,14 @@ import { scanCardsFromTags, makeCardFromBlock } from "../cardCreator"
 import { createCloze } from "../clozeUtils"
 import { insertDirection } from "../directionUtils"
 import { createListCardFromBlock } from "../listCardCreator"
+import { createTopicCard } from "../topicCardCreator"
 import { makeAICardFromBlock } from "../ai/aiCardCreator"
 import { testAIConnection } from "../ai/aiService"
+import { startAutoMarkExtract, stopAutoMarkExtract } from "../incrementalReadingAutoMark"
+import {
+  getIncrementalReadingSettings,
+  INCREMENTAL_READING_SETTINGS_KEYS
+} from "../settings/incrementalReadingSettingsSchema"
 
 export function registerCommands(
   pluginName: string
@@ -78,6 +84,28 @@ export function registerCommands(
     },
     {
       label: "SRS: 创建 Cloze 填空",
+      hasArgs: false
+    }
+  )
+
+  // 渐进阅读 Topic 卡命令：将当前块转换为 Topic 卡片
+  orca.commands.registerEditorCommand(
+    `${pluginName}.createTopicCard`,
+    async (editor, ...args) => {
+      const [panelId, rootBlockId, cursor] = editor
+      if (!cursor) {
+        orca.notify("error", "无法获取光标位置")
+        return null
+      }
+      const result = await createTopicCard(cursor, _pluginName)
+      return result ? { ret: result, undoArgs: result } : null
+    },
+    async undoArgs => {
+      if (!undoArgs || !undoArgs.blockId) return
+      console.log(`[${_pluginName}] Topic 卡片撤销：块 #${undoArgs.blockId}`)
+    },
+    {
+      label: "SRS: 创建 Topic 卡片",
       hasArgs: false
     }
   )
@@ -279,6 +307,34 @@ export function registerCommands(
     "SRS: 渐进阅读管理面板"
   )
 
+  // 渐进阅读自动标签开关
+  orca.commands.registerCommand(
+    `${pluginName}.toggleAutoExtractMark`,
+    async () => {
+      const { enableAutoExtractMark } = getIncrementalReadingSettings(_pluginName)
+      const nextValue = !enableAutoExtractMark
+
+      try {
+        await orca.plugins.setSettings("app", _pluginName, {
+          [INCREMENTAL_READING_SETTINGS_KEYS.enableAutoExtractMark]: nextValue
+        })
+
+        if (nextValue) {
+          startAutoMarkExtract(_pluginName)
+        } else {
+          stopAutoMarkExtract(_pluginName)
+        }
+
+        const statusText = nextValue ? "启用" : "禁用"
+        orca.notify("success", `渐进阅读自动标签已${statusText}`, { title: "渐进阅读" })
+      } catch (error) {
+        console.error(`[${_pluginName}] 切换渐进阅读自动标签失败:`, error)
+        orca.notify("error", `切换渐进阅读自动标签失败: ${error}`, { title: "渐进阅读" })
+      }
+    },
+    "SRS: 切换渐进阅读自动标签"
+  )
+
   // 渐进阅读编辑器命令（用于斜杠命令调用）
   orca.commands.registerEditorCommand(
     `${pluginName}.startIncrementalReadingSessionEditor`,
@@ -300,6 +356,7 @@ export function unregisterCommands(pluginName: string): void {
   orca.commands.unregisterCommand(`${pluginName}.scanCardsFromTags`)
   orca.commands.unregisterEditorCommand(`${pluginName}.makeCardFromBlock`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createCloze`)
+  orca.commands.unregisterEditorCommand(`${pluginName}.createTopicCard`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createListCard`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createDirectionForward`)
   orca.commands.unregisterEditorCommand(`${pluginName}.createDirectionBackward`)
@@ -315,5 +372,6 @@ export function unregisterCommands(pluginName: string): void {
   // 渐进阅读命令注销
   orca.commands.unregisterCommand(`${pluginName}.startIncrementalReadingSession`)
   orca.commands.unregisterCommand(`${pluginName}.openIRManager`)
+  orca.commands.unregisterCommand(`${pluginName}.toggleAutoExtractMark`)
   orca.commands.unregisterEditorCommand(`${pluginName}.startIncrementalReadingSessionEditor`)
 }

@@ -23,10 +23,15 @@ import type { DbId } from "./orca.d.ts"
 import { BlockWithRepr } from "./srs/blockUtils"
 import { aiSettingsSchema } from "./srs/ai/aiSettingsSchema"
 import { reviewSettingsSchema } from "./srs/settings/reviewSettingsSchema"
+import {
+  getIncrementalReadingSettings,
+  incrementalReadingSettingsSchema
+} from "./srs/settings/incrementalReadingSettingsSchema"
 import { getOrCreateReviewSessionBlock, cleanupReviewSessionBlock } from "./srs/reviewSessionManager"
 import { getOrCreateFlashcardHomeBlock } from "./srs/flashcardHomeManager"
 import { cleanupDeletedCards } from "./srs/deletedCardCleanup"
 import { getOrCreateIncrementalReadingSessionBlock } from "./srs/incrementalReadingSessionManager"
+import { startAutoMarkExtract, stopAutoMarkExtract } from "./srs/incrementalReadingAutoMark"
 import {
   cleanupIncrementalReadingManagerBlock,
   openIRManager as openIRManagerPanel
@@ -51,9 +56,10 @@ export async function load(_name: string) {
   try {
     await orca.plugins.setSettingsSchema(pluginName, {
       ...aiSettingsSchema,
-      ...reviewSettingsSchema
+      ...reviewSettingsSchema,
+      ...incrementalReadingSettingsSchema
     })
-    console.log(`[${pluginName}] 插件设置已注册（AI + 复习）`)
+    console.log(`[${pluginName}] 插件设置已注册（AI + 复习 + 渐进阅读）`)
   } catch (error) {
     console.warn(`[${pluginName}] 注册插件设置失败:`, error)
   }
@@ -66,6 +72,19 @@ export async function load(_name: string) {
   registerContextMenu(pluginName)
 
   console.log(`[${pluginName}] 命令、UI 组件、渲染器、转换器、右键菜单已注册`)
+
+  // 根据设置决定是否启动渐进阅读自动标记
+  try {
+    const { enableAutoExtractMark } = getIncrementalReadingSettings(pluginName)
+    if (enableAutoExtractMark) {
+      startAutoMarkExtract(pluginName)
+    } else {
+      console.log(`[${pluginName}] 渐进阅读自动标记已关闭`)
+    }
+  } catch (error) {
+    console.warn(`[${pluginName}] 读取渐进阅读设置失败，按默认启用处理:`, error)
+    startAutoMarkExtract(pluginName)
+  }
 
   // 延迟执行已删除卡片清理（避免阻塞启动）
   setTimeout(async () => {
@@ -82,6 +101,7 @@ export async function load(_name: string) {
  * 在插件禁用或 Orca 关闭时被调用
  */
 export async function unload() {
+  stopAutoMarkExtract(pluginName)
   unregisterCommands(pluginName)
   unregisterUIComponents(pluginName)
   unregisterRenderers(pluginName)

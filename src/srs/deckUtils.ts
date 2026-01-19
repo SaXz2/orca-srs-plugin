@@ -34,7 +34,7 @@ export type { CardType } from "./types"
  * 5. 或者添加 #choice 标签创建选择题卡片
  *
  * @param block - 块对象
- * @returns 卡片类型，"basic"、"cloze"、"direction"、"excerpt" 或 "choice"，默认为 "basic"
+ * @returns 卡片类型，"basic"、"cloze"、"direction"、"excerpt"、"choice"、"topic" 或 "extracts"，默认为 "basic"
  */
 export function extractCardType(block: Block): CardType {
   // 边界情况：块没有引用
@@ -87,7 +87,7 @@ export function extractCardType(block: Block): CardType {
     }
     const rawValue = typeValue[0].trim()
     const firstValue = rawValue.toLowerCase()
-    if (rawValue === "渐进阅读") return "渐进阅读"
+    if (firstValue === "topic") return "topic"
     if (firstValue === "extracts") return "extracts"
     if (firstValue === "cloze") return "cloze"
     if (firstValue === "direction") return "direction"
@@ -99,7 +99,7 @@ export function extractCardType(block: Block): CardType {
     // 单选类型：直接使用字符串
     const rawValue = typeValue.trim()
     const trimmedValue = rawValue.toLowerCase()
-    if (rawValue === "渐进阅读") return "渐进阅读"
+    if (trimmedValue === "topic") return "topic"
     if (trimmedValue === "extracts") return "extracts"
     if (trimmedValue === "cloze") return "cloze"
     if (trimmedValue === "direction") return "direction"
