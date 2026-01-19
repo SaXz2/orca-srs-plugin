@@ -102,6 +102,41 @@ export async function collectIRCardsFromBlocks(
 }
 
 /**
+ * 基于给定块列表收集所有渐进阅读卡片（便于测试）
+ */
+export async function collectAllIRCardsFromBlocks(
+  blocks: Block[],
+  pluginName: string = "srs-plugin"
+): Promise<IRCard[]> {
+  const results: IRCard[] = []
+
+  for (const block of blocks) {
+    const cardType = extractCardType(block)
+    if (cardType !== "渐进阅读" && cardType !== "extracts") continue
+
+    try {
+      await ensureIRState(block.id)
+      const state = await loadIRState(block.id)
+      const isNew = !state.lastRead
+
+      results.push({
+        id: block.id,
+        cardType,
+        priority: state.priority,
+        due: state.due,
+        lastRead: state.lastRead,
+        readCount: state.readCount,
+        isNew
+      })
+    } catch (error) {
+      console.error(`[${pluginName}] collectAllIRCardsFromBlocks: 处理块 #${block.id} 失败:`, error)
+    }
+  }
+
+  return results
+}
+
+/**
  * 收集到期的 Topic/Extract 卡片
  */
 export async function collectIRCards(pluginName: string = "srs-plugin"): Promise<IRCard[]> {
@@ -110,6 +145,20 @@ export async function collectIRCards(pluginName: string = "srs-plugin"): Promise
     return await collectIRCardsFromBlocks(taggedBlocks, pluginName)
   } catch (error) {
     console.error(`[${pluginName}] collectIRCards 失败:`, error)
+    orca.notify("error", "渐进阅读卡片收集失败", { title: "渐进阅读" })
+    return []
+  }
+}
+
+/**
+ * 收集所有 Topic/Extract 卡片（不限到期状态）
+ */
+export async function collectAllIRCards(pluginName: string = "srs-plugin"): Promise<IRCard[]> {
+  try {
+    const taggedBlocks = await collectTaggedBlocks(pluginName)
+    return await collectAllIRCardsFromBlocks(taggedBlocks, pluginName)
+  } catch (error) {
+    console.error(`[${pluginName}] collectAllIRCards 失败:`, error)
     orca.notify("error", "渐进阅读卡片收集失败", { title: "渐进阅读" })
     return []
   }

@@ -224,3 +224,36 @@ export async function updatePriority(blockId: DbId, newPriority: number): Promis
     throw error
   }
 }
+
+/**
+ * 批量更新优先级
+ */
+export async function bulkUpdatePriority(
+  blockIds: DbId[],
+  newPriority: number
+): Promise<{ success: DbId[]; failed: Array<{ id: DbId; error: string }> }> {
+  if (blockIds.length === 0) {
+    return { success: [], failed: [] }
+  }
+
+  const results = await Promise.allSettled(
+    blockIds.map(blockId => updatePriority(blockId, newPriority))
+  )
+
+  const success: DbId[] = []
+  const failed: Array<{ id: DbId; error: string }> = []
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      success.push(blockIds[index])
+      return
+    }
+    const reason = result.reason
+    failed.push({
+      id: blockIds[index],
+      error: reason instanceof Error ? reason.message : String(reason ?? "未知错误")
+    })
+  })
+
+  return { success, failed }
+}

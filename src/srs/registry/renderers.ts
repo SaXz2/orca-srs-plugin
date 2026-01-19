@@ -8,6 +8,7 @@ import SrsCardBlockRenderer from "../../components/SrsCardBlockRenderer"
 import SrsReviewSessionRenderer from "../../components/SrsReviewSessionRenderer"
 import SrsFlashcardHomeRenderer from "../../components/SrsFlashcardHomeRenderer"
 import IncrementalReadingSessionRenderer from "../../components/IncrementalReadingSessionRenderer"
+import IncrementalReadingManagerPanel from "../../components/IncrementalReadingManagerPanel"
 import ClozeInlineRenderer from "../../components/ClozeInlineRenderer"
 import DirectionInlineRenderer from "../../components/DirectionInlineRenderer"
 import ChoiceCardBlockRenderer from "../../components/ChoiceCardBlockRenderer"
@@ -78,6 +79,15 @@ export function registerRenderers(pluginName: string): void {
     false
   )
 
+  // 渐进阅读管理面板渲染器
+  orca.renderers.registerBlock(
+    "srs.ir-manager",
+    false,
+    IncrementalReadingManagerPanel,
+    [],
+    false
+  )
+
   // Cloze inline 渲染器
   orca.renderers.registerInline(
     `${pluginName}.cloze`,
@@ -101,6 +111,7 @@ export function unregisterRenderers(pluginName: string): void {
   orca.renderers.unregisterBlock("srs.review-session")
   orca.renderers.unregisterBlock("srs.flashcard-home")
   orca.renderers.unregisterBlock("srs.ir-session")
+  orca.renderers.unregisterBlock("srs.ir-manager")
   orca.renderers.unregisterInline(`${pluginName}.cloze`)
   orca.renderers.unregisterInline(`${pluginName}.direction`)
 }

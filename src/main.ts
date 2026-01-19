@@ -27,6 +27,10 @@ import { getOrCreateReviewSessionBlock, cleanupReviewSessionBlock } from "./srs/
 import { getOrCreateFlashcardHomeBlock } from "./srs/flashcardHomeManager"
 import { cleanupDeletedCards } from "./srs/deletedCardCleanup"
 import { getOrCreateIncrementalReadingSessionBlock } from "./srs/incrementalReadingSessionManager"
+import {
+  cleanupIncrementalReadingManagerBlock,
+  openIRManager as openIRManagerPanel
+} from "./srs/incrementalReadingManagerUtils"
 
 // 插件全局状态
 let pluginName: string
@@ -83,6 +87,7 @@ export async function unload() {
   unregisterRenderers(pluginName)
   unregisterConverters(pluginName)
   unregisterContextMenu(pluginName)
+  await cleanupIncrementalReadingManagerBlock(pluginName)
   console.log(`[${pluginName}] 插件已卸载`)
 }
 
@@ -261,6 +266,18 @@ async function startIncrementalReadingSession(openInCurrentPanel: boolean = fals
     console.error(`[${pluginName}] 启动渐进阅读失败:`, error)
     orca.notify("error", `启动渐进阅读失败: ${error}`, { title: "渐进阅读" })
   }
+}
+
+// ========================================
+// 渐进阅读管理面板
+// ========================================
+
+/**
+ * 打开渐进阅读管理面板
+ * 默认在当前面板打开
+ */
+async function openIRManager() {
+  await openIRManagerPanel(pluginName)
 }
 
 // ========================================
@@ -502,6 +519,7 @@ export {
   startReviewSession,
   buildReviewQueue,
   buildReviewQueueWithChildren,
+  openIRManager,
   openFlashcardHome,
   startRepeatReviewSession,
   startIncrementalReadingSession

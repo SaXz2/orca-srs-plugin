@@ -268,6 +268,17 @@ export function registerCommands(
     "SRS: 打开渐进阅读面板"
   )
 
+  // 打开渐进阅读管理面板命令
+  orca.commands.registerCommand(
+    `${pluginName}.openIRManager`,
+    async () => {
+      console.log(`[${_pluginName}] 打开渐进阅读管理面板`)
+      const { openIRManager } = await import("../../main")
+      await openIRManager()
+    },
+    "SRS: 渐进阅读管理面板"
+  )
+
   // 渐进阅读编辑器命令（用于斜杠命令调用）
   orca.commands.registerEditorCommand(
     `${pluginName}.startIncrementalReadingSessionEditor`,
@@ -303,5 +314,6 @@ export function unregisterCommands(pluginName: string): void {
 
   // 渐进阅读命令注销
   orca.commands.unregisterCommand(`${pluginName}.startIncrementalReadingSession`)
+  orca.commands.unregisterCommand(`${pluginName}.openIRManager`)
   orca.commands.unregisterEditorCommand(`${pluginName}.startIncrementalReadingSessionEditor`)
 }
