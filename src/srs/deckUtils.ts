@@ -85,7 +85,10 @@ export function extractCardType(block: Block): CardType {
     if (typeValue.length === 0 || !typeValue[0] || typeof typeValue[0] !== "string") {
       return "basic"
     }
-    const firstValue = typeValue[0].trim().toLowerCase()
+    const rawValue = typeValue[0].trim()
+    const firstValue = rawValue.toLowerCase()
+    if (rawValue === "渐进阅读") return "渐进阅读"
+    if (firstValue === "extracts") return "extracts"
     if (firstValue === "cloze") return "cloze"
     if (firstValue === "direction") return "direction"
     if (firstValue === "list") return "list"
@@ -94,7 +97,10 @@ export function extractCardType(block: Block): CardType {
     return "basic"
   } else if (typeof typeValue === "string") {
     // 单选类型：直接使用字符串
-    const trimmedValue = typeValue.trim().toLowerCase()
+    const rawValue = typeValue.trim()
+    const trimmedValue = rawValue.toLowerCase()
+    if (rawValue === "渐进阅读") return "渐进阅读"
+    if (trimmedValue === "extracts") return "extracts"
     if (trimmedValue === "cloze") return "cloze"
     if (trimmedValue === "direction") return "direction"
     if (trimmedValue === "list") return "list"

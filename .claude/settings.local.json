@@ -15,5 +15,9 @@
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "mcp-router"
+  ],
+  "enableAllProjectMcpServers": true
 }

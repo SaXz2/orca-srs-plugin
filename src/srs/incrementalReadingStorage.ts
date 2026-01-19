@@ -1,0 +1,226 @@
+/**
+ * 渐进阅读状态存储模块
+ *
+ * 使用 Block Properties 存储 ir.* 状态：
+ * - ir.priority: number (1-10)
+ * - ir.lastRead: Date | null
+ * - ir.readCount: number
+ * - ir.due: Date
+ */
+
+import type { Block, DbId } from "../orca.d.ts"
+import { calculateNextDue, normalizePriority } from "./incrementalReadingScheduler"
+
+export type IRState = {
+  priority: number
+  lastRead: Date | null
+  readCount: number
+  due: Date
+}
+
+const DEFAULT_PRIORITY = 5
+
+// ============================================================================
+// 块读取缓存（避免重复 get-block）
+// ============================================================================
+
+const blockCache = new Map<DbId, Block | null>()
+
+const getBlockCached = async (blockId: DbId): Promise<Block | undefined> => {
+  if (blockCache.has(blockId)) {
+    return blockCache.get(blockId) ?? undefined
+  }
+
+  const block = (await orca.invokeBackend("get-block", blockId)) as Block | undefined
+  blockCache.set(blockId, block ?? null)
+  return block
+}
+
+export const invalidateIrBlockCache = (blockId: DbId): void => {
+  blockCache.delete(blockId)
+}
+
+// ============================================================================
+// 工具函数
+// ============================================================================
+
+const readProp = (block: Block | undefined, name: string): any =>
+  block?.properties?.find(prop => prop.name === name)?.value
+
+const parseNumber = (value: any, fallback: number): number => {
+  if (typeof value === "number") return value
+  if (typeof value === "string") {
+    const num = Number(value)
+    if (Number.isFinite(num)) return num
+  }
+  return fallback
+}
+
+const parseDate = (value: any, fallback: Date | null): Date | null => {
+  if (!value) return fallback
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed
+}
+
+const buildDefaultState = (priority: number, lastRead: Date | null): IRState => {
+  const normalizedPriority = normalizePriority(priority)
+  const baseDate = lastRead ?? new Date()
+  return {
+    priority: normalizedPriority,
+    lastRead,
+    readCount: 0,
+    due: calculateNextDue(normalizedPriority, baseDate)
+  }
+}
+
+// ============================================================================
+// 核心 API
+// ============================================================================
+
+/**
+ * 加载渐进阅读状态
+ */
+export async function loadIRState(blockId: DbId): Promise<IRState> {
+  const now = new Date()
+  const initial = buildDefaultState(DEFAULT_PRIORITY, null)
+
+  try {
+    const block = await getBlockCached(blockId)
+    if (!block) return initial
+
+    const rawPriority = parseNumber(readProp(block, "ir.priority"), DEFAULT_PRIORITY)
+    const lastRead = parseDate(readProp(block, "ir.lastRead"), null)
+    const readCount = parseNumber(readProp(block, "ir.readCount"), 0)
+    const due = parseDate(readProp(block, "ir.due"), null)
+
+    const priority = normalizePriority(rawPriority)
+    const normalizedDue = due ?? calculateNextDue(priority, lastRead ?? now)
+
+    return {
+      priority,
+      lastRead,
+      readCount,
+      due: normalizedDue
+    }
+  } catch (error) {
+    console.error("[IR] 读取渐进阅读状态失败:", error)
+    orca.notify("error", "读取渐进阅读状态失败", { title: "渐进阅读" })
+    return initial
+  }
+}
+
+/**
+ * 保存渐进阅读状态
+ */
+export async function saveIRState(blockId: DbId, state: IRState): Promise<void> {
+  try {
+    await orca.commands.invokeEditorCommand(
+      "core.editor.setProperties",
+      null,
+      [blockId],
+      [
+        { name: "ir.priority", value: state.priority, type: 3 },
+        { name: "ir.lastRead", value: state.lastRead ?? null, type: 5 },
+        { name: "ir.readCount", value: state.readCount, type: 3 },
+        { name: "ir.due", value: state.due, type: 5 }
+      ]
+    )
+
+    invalidateIrBlockCache(blockId)
+  } catch (error) {
+    console.error("[IR] 保存渐进阅读状态失败:", error)
+    orca.notify("error", "保存渐进阅读状态失败", { title: "渐进阅读" })
+    throw error
+  }
+}
+
+/**
+ * 确保块存在渐进阅读状态（仅在缺失时初始化）
+ */
+export async function ensureIRState(blockId: DbId): Promise<IRState> {
+  try {
+    const block = await getBlockCached(blockId)
+    const state = await loadIRState(blockId)
+
+    const props = block?.properties ?? []
+    const hasPriority = props.some(prop => prop.name === "ir.priority")
+    const hasLastRead = props.some(prop => prop.name === "ir.lastRead")
+    const hasReadCount = props.some(prop => prop.name === "ir.readCount")
+    const hasDue = props.some(prop => prop.name === "ir.due")
+    const rawPriority = parseNumber(readProp(block, "ir.priority"), DEFAULT_PRIORITY)
+    const normalizedPriority = normalizePriority(rawPriority)
+    const rawDue = parseDate(readProp(block, "ir.due"), null)
+
+    const shouldWrite = !hasPriority
+      || !hasLastRead
+      || !hasReadCount
+      || !hasDue
+      || rawPriority !== normalizedPriority
+      || !rawDue
+
+    if (shouldWrite) {
+      const baseDate = state.lastRead ?? new Date()
+      const normalizedState: IRState = {
+        priority: normalizedPriority,
+        lastRead: state.lastRead,
+        readCount: state.readCount,
+        due: calculateNextDue(normalizedPriority, baseDate)
+      }
+      await saveIRState(blockId, normalizedState)
+      return normalizedState
+    }
+
+    return state
+  } catch (error) {
+    console.error("[IR] 初始化渐进阅读状态失败:", error)
+    orca.notify("error", "初始化渐进阅读状态失败", { title: "渐进阅读" })
+    throw error
+  }
+}
+
+/**
+ * 标记已读：更新 lastRead/readCount/due
+ */
+export async function markAsRead(blockId: DbId): Promise<IRState> {
+  try {
+    const prev = await loadIRState(blockId)
+    const now = new Date()
+    const nextState: IRState = {
+      priority: prev.priority,
+      lastRead: now,
+      readCount: prev.readCount + 1,
+      due: calculateNextDue(prev.priority, now)
+    }
+    await saveIRState(blockId, nextState)
+    return nextState
+  } catch (error) {
+    console.error("[IR] 标记已读失败:", error)
+    orca.notify("error", "标记已读失败", { title: "渐进阅读" })
+    throw error
+  }
+}
+
+/**
+ * 更新优先级并重算 due（基于当前时间）
+ */
+export async function updatePriority(blockId: DbId, newPriority: number): Promise<IRState> {
+  try {
+    const prev = await loadIRState(blockId)
+    const now = new Date()
+    const normalizedPriority = normalizePriority(newPriority)
+
+    const nextState: IRState = {
+      priority: normalizedPriority,
+      lastRead: prev.lastRead,
+      readCount: prev.readCount,
+      due: calculateNextDue(normalizedPriority, now)
+    }
+
+    await saveIRState(blockId, nextState)
+    return nextState
+  } catch (error) {
+    console.error("[IR] 更新优先级失败:", error)
+    orca.notify("error", "更新优先级失败", { title: "渐进阅读" })
+    throw error
+  }
+}

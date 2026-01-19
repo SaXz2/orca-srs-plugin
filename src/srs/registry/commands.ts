@@ -256,6 +256,33 @@ export function registerCommands(
     },
     "SRS: 打开 Flash Home"
   )
+
+  // 打开渐进阅读面板命令
+  orca.commands.registerCommand(
+    `${pluginName}.startIncrementalReadingSession`,
+    async () => {
+      console.log(`[${_pluginName}] 打开渐进阅读面板`)
+      const { startIncrementalReadingSession } = await import("../../main")
+      await startIncrementalReadingSession()
+    },
+    "SRS: 打开渐进阅读面板"
+  )
+
+  // 渐进阅读编辑器命令（用于斜杠命令调用）
+  orca.commands.registerEditorCommand(
+    `${pluginName}.startIncrementalReadingSessionEditor`,
+    async () => {
+      console.log(`[${_pluginName}] 打开渐进阅读面板（编辑器命令）`)
+      const { startIncrementalReadingSession } = await import("../../main")
+      await startIncrementalReadingSession()
+      return null
+    },
+    async () => {},
+    {
+      label: "SRS: 打开渐进阅读面板",
+      hasArgs: false
+    }
+  )
 }
 
 export function unregisterCommands(pluginName: string): void {
@@ -273,4 +300,8 @@ export function unregisterCommands(pluginName: string): void {
   
   // Flash Home 命令注销
   orca.commands.unregisterCommand(`${pluginName}.openFlashcardHome`)
+
+  // 渐进阅读命令注销
+  orca.commands.unregisterCommand(`${pluginName}.startIncrementalReadingSession`)
+  orca.commands.unregisterEditorCommand(`${pluginName}.startIncrementalReadingSessionEditor`)
 }

@@ -121,6 +121,10 @@ async function autoMarkAsExtract(blockId: DbId, pluginName: string): Promise<voi
     const { ensureCardSrsState } = await import("./storage")
     await ensureCardSrsState(blockId)
 
+    // 初始化渐进阅读状态（ir.*）
+    const { ensureIRState } = await import("./incrementalReadingStorage")
+    await ensureIRState(blockId)
+
     processedBlocks.add(blockId)
     console.log(`[${pluginName}] 自动标记完成: 块 ${blockId}`)
   } catch (error) {

@@ -26,6 +26,7 @@ import { reviewSettingsSchema } from "./srs/settings/reviewSettingsSchema"
 import { getOrCreateReviewSessionBlock, cleanupReviewSessionBlock } from "./srs/reviewSessionManager"
 import { getOrCreateFlashcardHomeBlock } from "./srs/flashcardHomeManager"
 import { cleanupDeletedCards } from "./srs/deletedCardCleanup"
+import { getOrCreateIncrementalReadingSessionBlock } from "./srs/incrementalReadingSessionManager"
 
 // 插件全局状态
 let pluginName: string
@@ -193,6 +194,73 @@ export function getReviewHostPanelId(): string | null {
  */
 export function getPluginName(): string {
   return pluginName
+}
+
+// ========================================
+// 渐进阅读会话管理
+// ========================================
+
+/**
+ * 启动渐进阅读会话
+ * 使用块渲染器模式，创建虚拟块
+ *
+ * @param openInCurrentPanel - 是否在当前面板打开
+ */
+async function startIncrementalReadingSession(openInCurrentPanel: boolean = false) {
+  try {
+    const activePanelId = orca.state.activePanel
+
+    if (!activePanelId) {
+      orca.notify("warn", "当前没有可用的面板", { title: "渐进阅读" })
+      return
+    }
+
+    const blockId = await getOrCreateIncrementalReadingSessionBlock(pluginName)
+
+    if (openInCurrentPanel) {
+      orca.nav.goTo("block", { blockId }, activePanelId)
+      orca.notify("success", "渐进阅读面板已打开", { title: "渐进阅读" })
+      console.log(`[${pluginName}] 渐进阅读已在当前面板启动，面板ID: ${activePanelId}`)
+      return
+    }
+
+    const panels = orca.state.panels
+    let rightPanelId: string | null = null
+
+    for (const [panelId, panel] of Object.entries(panels)) {
+      if (panel.parentId === activePanelId && panel.position === "right") {
+        rightPanelId = panelId
+        break
+      }
+    }
+
+    if (!rightPanelId) {
+      rightPanelId = orca.nav.addTo(activePanelId, "right", {
+        view: "block",
+        viewArgs: { blockId },
+        viewState: {}
+      })
+
+      if (!rightPanelId) {
+        orca.notify("error", "无法创建侧边面板", { title: "渐进阅读" })
+        return
+      }
+    } else {
+      orca.nav.goTo("block", { blockId }, rightPanelId)
+    }
+
+    if (rightPanelId) {
+      setTimeout(() => {
+        orca.nav.switchFocusTo(rightPanelId!)
+      }, 100)
+    }
+
+    orca.notify("success", "渐进阅读面板已在右侧打开", { title: "渐进阅读" })
+    console.log(`[${pluginName}] 渐进阅读已启动，面板ID: ${rightPanelId}`)
+  } catch (error) {
+    console.error(`[${pluginName}] 启动渐进阅读失败:`, error)
+    orca.notify("error", `启动渐进阅读失败: ${error}`, { title: "渐进阅读" })
+  }
 }
 
 // ========================================
@@ -435,7 +503,8 @@ export {
   buildReviewQueue,
   buildReviewQueueWithChildren,
   openFlashcardHome,
-  startRepeatReviewSession
+  startRepeatReviewSession,
+  startIncrementalReadingSession
 }
 
 // 导出子卡片收集器

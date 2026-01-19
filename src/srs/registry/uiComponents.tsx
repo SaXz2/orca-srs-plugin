@@ -36,6 +36,18 @@ export function registerUIComponents(pluginName: string): void {
     </orca.components.Button>
   ))
 
+  // 渐进阅读按钮 - 打开渐进阅读面板
+  orca.headbar.registerHeadbarButton(`${pluginName}.incrementalReadingButton`, () => (
+    <orca.components.Button
+      variant="plain"
+      tabIndex={-1}
+      onClick={() => orca.commands.invokeCommand(`${pluginName}.startIncrementalReadingSession`)}
+      title="打开渐进阅读"
+    >
+      <i className="ti ti-book-2 orca-headbar-icon" />
+    </orca.components.Button>
+  ))
+
   // ============ 工具栏按钮 ============
   
   orca.toolbar.registerToolbarButton(`${pluginName}.clozeButton`, {
@@ -82,12 +94,22 @@ export function registerUIComponents(pluginName: string): void {
     title: "AI 生成记忆卡片",
     command: `${pluginName}.makeAICard`
   })
+
+  // ============ 渐进阅读斜杠命令 ============
+
+  orca.slashCommands.registerSlashCommand(`${pluginName}.incrementalReading`, {
+    icon: "ti ti-book-2",
+    group: "SRS",
+    title: "渐进阅读",
+    command: `${pluginName}.startIncrementalReadingSessionEditor`
+  })
 }
 
 export function unregisterUIComponents(pluginName: string): void {
   // 顶部栏按钮
   orca.headbar.unregisterHeadbarButton(`${pluginName}.reviewButton`)
   orca.headbar.unregisterHeadbarButton(`${pluginName}.flashHomeButton`)
+  orca.headbar.unregisterHeadbarButton(`${pluginName}.incrementalReadingButton`)
   
   // 工具栏按钮
   orca.toolbar.unregisterToolbarButton(`${pluginName}.clozeButton`)
@@ -98,4 +120,5 @@ export function unregisterUIComponents(pluginName: string): void {
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.directionForward`)
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.directionBackward`)
   orca.slashCommands.unregisterSlashCommand(`${pluginName}.aiCard`)
+  orca.slashCommands.unregisterSlashCommand(`${pluginName}.incrementalReading`)
 }

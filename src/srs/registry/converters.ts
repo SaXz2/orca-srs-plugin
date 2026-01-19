@@ -70,6 +70,13 @@ export function registerConverters(pluginName: string): void {
     () => "[SRS Flashcard Home 面板块]"
   )
 
+  // 渐进阅读会话转换器
+  orca.converters.registerBlock(
+    "plain",
+    "srs.ir-session",
+    () => "[SRS 渐进阅读面板块]"
+  )
+
   // Cloze inline 转换器
   // 将 cloze fragment 转换为纯文本时，只返回填空内容本身
   orca.converters.registerInline(
@@ -100,6 +107,7 @@ export function unregisterConverters(pluginName: string): void {
   orca.converters.unregisterBlock("plain", "srs.choice-card")
   orca.converters.unregisterBlock("plain", "srs.review-session")
   orca.converters.unregisterBlock("plain", "srs.flashcard-home")
+  orca.converters.unregisterBlock("plain", "srs.ir-session")
   orca.converters.unregisterInline("plain", `${pluginName}.cloze`)
   orca.converters.unregisterInline("plain", `${pluginName}.direction`)
 }
